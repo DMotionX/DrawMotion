@@ -36,6 +36,10 @@ class DownloadWorker(QThread):
     def run(self):
         temp_files = []
         try:
+            if not self.url.startswith("https://"):
+                self.error.emit("Insecure download URL: HTTPS required.")
+                return
+
             # Step 1: Resolve redirects and get total content length
             headers = {
                 'User-Agent': 'DrawMotion-FastUpdater/1.0',
@@ -43,8 +47,11 @@ class DownloadWorker(QThread):
             }
             req = urllib.request.Request(self.url, headers=headers)
             
-            with urllib.request.urlopen(req, timeout=12) as response:
+            with urllib.request.urlopen(req, timeout=12) as response:  # nosec B310
                 final_url = response.geturl()
+                if not final_url.startswith("https://"):
+                    self.error.emit("Insecure redirect URL: HTTPS required.")
+                    return
                 file_size = int(response.headers.get('Content-Length', 0))
                 accept_ranges = response.headers.get('Accept-Ranges', 'none').lower()
 
@@ -76,7 +83,7 @@ class DownloadWorker(QThread):
                     'Accept-Encoding': 'identity'
                 })
                 try:
-                    with urllib.request.urlopen(chunk_req, timeout=20) as resp, open(temp_files[index], 'wb') as out_f:
+                    with urllib.request.urlopen(chunk_req, timeout=20) as resp, open(temp_files[index], 'wb') as out_f:  # nosec B310
                         # 1MB buffer for maximum throughput
                         while chunk_data := resp.read(1048576):
                             if self._is_cancelled:
@@ -147,8 +154,11 @@ class DownloadWorker(QThread):
                 
     def _download_sequential(self, final_url):
         try:
+            if not final_url.startswith("https://"):
+                self.error.emit("Insecure download URL: HTTPS required.")
+                return
             req = urllib.request.Request(final_url, headers={'User-Agent': 'DrawMotion-FastUpdater/1.0'})
-            with urllib.request.urlopen(req, timeout=20) as resp, open(self.save_path, 'wb') as out_f:
+            with urllib.request.urlopen(req, timeout=20) as resp, open(self.save_path, 'wb') as out_f:  # nosec B310
                 total_len = int(resp.headers.get('Content-Length', 0))
                 downloaded = 0
                 start_time = time.time()

@@ -33,6 +33,24 @@ jobs:
           if (Test-Path "assets/library") { Remove-Item -Recurse -Force "assets/library" }
           if (Test-Path "*.sqlite") { Remove-Item -Force "*.sqlite" }
 
+      - name: Provision FFmpeg Binary for Packaging
+        run: |
+          if (-not (Test-Path "bin")) { New-Item -ItemType Directory -Path "bin" -Force }
+          if (-not (Test-Path "bin\ffmpeg.exe")) {
+            $ffmpegCmd = Get-Command ffmpeg -ErrorAction SilentlyContinue
+            if ($ffmpegCmd) {
+              Copy-Item -Force $ffmpegCmd.Source "bin\ffmpeg.exe"
+              Write-Host "FFmpeg provisioned from system runner environment."
+            } else {
+              Write-Host "Downloading standalone FFmpeg..."
+              Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+              Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_temp"
+              $found = (Get-ChildItem -Path "ffmpeg_temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1).FullName
+              Copy-Item -Force $found "bin\ffmpeg.exe"
+              Remove-Item -Recurse -Force "ffmpeg.zip", "ffmpeg_temp"
+            }
+          }
+
       - name: Build Standalone with Nuitka
         run: |
           python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py

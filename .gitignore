@@ -37,10 +37,10 @@ build_out/
 *.build/
 *.onefile-build/
 *.exe
-!bin/*.exe
 !core/security_engine/bin/*.exe
-!bin/ffmpeg.exe
-!bin/ffprobe.exe
+bin/*.exe
+bin/ffmpeg.exe
+bin/ffprobe.exe
 msix_build/
 msix_staging/
 dist_linux/
@@ -49,6 +49,9 @@ dist_linux/
 *.appx
 *.appxbundle
 *.msixbundle
+*.zip
+*.tar.gz
+*.7z
 
 # Nuitka Reports and Crash Dumps
 nuitka-crash-report.xml

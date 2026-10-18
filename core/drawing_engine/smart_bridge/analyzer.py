@@ -19,7 +19,11 @@ class SVGAnalyzer:
 
         # 2. Deep check: Number of paths/nodes
         try:
-            tree = ET.parse(file_path)
+            try:
+                import defusedxml.ElementTree as SafeET
+                tree = SafeET.parse(file_path)
+            except ImportError:
+                tree = ET.parse(file_path)  # nosec B314
             root = tree.getroot()
             
             # Count elements that require drawing algorithms

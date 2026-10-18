@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Purpose: Project management engine.
 Features: Handles saving and loading of DrawMotion project files (.wip ZIP archives containing project.json, assets, and fonts).

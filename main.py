@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Purpose: Main entry point for the DrawMotion application.
 Features: Initializes the Qt Application, applies the global theme, and sets up the main window structure (TopBar, LeftPanel, CenterWorkspace, RightPanel, BottomPanel).

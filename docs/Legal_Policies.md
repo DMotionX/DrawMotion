@@ -2,7 +2,9 @@
 
 **Last Updated: October 2026**  
 **Official Team Email:** [easysoft.dv2team@gmail.com](mailto:easysoft.dv2team@gmail.com)  
-**Official Portal:** [https://drawmotion-web.vercel.app/](https://drawmotion-web.vercel.app/)
+**Official Portal:** [https://drawmotion-web.vercel.app/](https://drawmotion-web.vercel.app/)  
+**Official Repository:** [https://github.com/DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)  
+**Official Facebook Page:** [https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR](https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR)
 
 Welcome to DrawMotion! These policies define the terms of use, software license, privacy practices, and third-party notices. By downloading, installing, or using DrawMotion, you agree to be bound by this agreement.
 
@@ -27,19 +29,16 @@ DrawMotion is provided completely free of charge. You are granted a non-exclusiv
 
 - **You Own Your Output (Full Monetization Rights):** All videos, animations, illustrations, and exported media you produce with DrawMotion belong 100% to you. You are completely free to monetize your creations on YouTube, social media, commercial advertising, or client freelance contracts without paying royalties, licensing fees, or attribution to us.
 
-### 2.2 Software Distribution & Commercial Restrictions
-While your creative output is unrestricted, the DrawMotion software application itself is subject to the following limitations:
-- **No Selling or Renting:** You may not sell, resell, rent, lease, sublicense, or charge any fee for the DrawMotion software, whether standalone or bundled.
-- **No Unauthorized Packaging:** You may not repackage DrawMotion into third-party installers, adware bundles, or commercial software suites.
-- **No Hosted Cloud Services:** You may not offer DrawMotion as a hosted remote service, cloud subscription, or time-shared software-as-a-service (SaaS) without explicit written permission from the author.
+### 2.2 Free and Open-Source Software (GNU GPLv3)
+DrawMotion is official Free and Open-Source Software (FOSS). The entire application source code is publicly accessible and licensed under the **GNU General Public License v3.0 (GPLv3)**.
 
-### 2.3 Proprietary Application & LGPLv3 Carve-Out
-DrawMotion's proprietary application source code (including our custom vector planning algorithms, timeline synchronization engine, and rendering pipelines) is closed-source and owned by Mohamed Fadl.
+You are free to inspect, study, fork, modify, and contribute to DrawMotion in accordance with the terms of the GNU GPLv3. Any derivative works or modifications that you distribute must also be made available as open-source under the GNU GPLv3, preserving freedom for creators worldwide.
 
-**Important Open-Source Exception:**  
-Nothing in this agreement restricts, overrides, or limits your rights under the licenses of third-party open-source components utilized by DrawMotion. Specifically, in compliance with the **GNU Lesser General Public License (LGPLv3)** governing Qt 6 and PySide6:
-- You retain the right to modify or replace the dynamically linked Qt/PySide6 shared libraries (`.dll`, `.pyd`) with your own compatible versions.
-- You are permitted to perform reverse engineering strictly and solely to the extent necessary to debug modifications to those third-party LGPL libraries.
+### 2.3 Software Integrity & Responsible Distribution
+While the source code is free and open under GPLv3, to protect users from malicious tampering or modified adware clones:
+- Official binaries and installers bearing the **DrawMotion** brand name and icons are officially built and released exclusively by **Mohamed Fadl** and the **EASY SOFT TEAM**.
+- You may not repackage DrawMotion into third-party adware bundles, malware wrappers, or deceptive commercial installers.
+- You may not offer DrawMotion as a deceptive paid subscription without clear notice of its free, open-source nature.
 
 ### 2.4 Third-Party Software Notices
 DrawMotion gratefully utilizes high-quality open-source frameworks:

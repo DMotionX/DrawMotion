@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import json
 import urllib.request
@@ -48,8 +50,10 @@ class UpdateCheckerThread(QThread):
             return
         try:
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            if not url.startswith("https://"):
+                raise ValueError("Insecure update URL scheme")
             req = urllib.request.Request(url, headers={'User-Agent': 'DrawMotion-Updater'})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:  # nosec B310
                 if self._is_cancelled:
                     return
                 data = json.loads(response.read().decode())

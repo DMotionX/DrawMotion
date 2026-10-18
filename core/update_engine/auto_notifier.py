@@ -32,8 +32,10 @@ class SilentUpdateChecker(QThread):
             return
         try:
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            if not url.startswith("https://"):
+                raise ValueError("Insecure update URL scheme")
             req = urllib.request.Request(url, headers={'User-Agent': 'DrawMotion-AutoNotifier/1.0'})
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=4) as response:  # nosec B310
                 if self._is_cancelled:
                     return
                 data = json.loads(response.read().decode())

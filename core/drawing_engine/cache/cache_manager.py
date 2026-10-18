@@ -14,7 +14,7 @@ class CacheManager:
         Creates a unique hash key based on the path, the applied style, and zoom level.
         """
         raw_key = f"{path_data}_{style_name}_{zoom_level}"
-        return hashlib.md5(raw_key.encode('utf-8')).hexdigest()
+        return hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
         
     def get(self, key: str) -> Optional[Any]:
         return self._cache.get(key)
