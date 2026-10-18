@@ -57,6 +57,6 @@ Copyright (c) 2026 Mohamed Fadl (EASY SOFT TEAM). All rights reserved.
 For any questions, clarifications, or privacy feedback:
 - Email: easysoft.dv2team@gmail.com
 - Official Portal: https://drawmotion-web.vercel.app/
-- GitHub: https://github.com/MohamedFadl2344/DrawMotion
+- GitHub: https://github.com/DMotionX/DrawMotion
 - Developer on X: https://x.com/MohamedFad19757
 - Facebook: https://www.facebook.com/profile.php?id=61592234934862

@@ -20,7 +20,7 @@ Thank you for your interest in contributing to DrawMotion. We are building an op
    ```
 3. Set the upstream remote:
    ```bash
-   git remote add upstream https://github.com/MohamedFadl2344/DrawMotion.git
+   git remote add upstream https://github.com/DMotionX/DrawMotion.git
    ```
 
 ### 3. Environment Setup

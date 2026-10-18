@@ -31,7 +31,7 @@ We actively invite Python developers, Qt engineers, animators, and beta testers 
 * **Official Facebook Page:** [EASY SOFT Team Official](https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR)
 * **Official Website:** [drawmotion-web.vercel.app](https://drawmotion-web.vercel.app/)
 * **Founder on X / Twitter:** [@MohamedFad19757](https://x.com/MohamedFad19757)
-* **GitHub Repository:** [MohamedFadl2344/DrawMotion](https://github.com/MohamedFadl2344)
+* **GitHub Repository:** [DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)
 * **Support and Inquiries:** `easysoft.dv2team@gmail.com`
 
 ---
@@ -57,7 +57,7 @@ Run DrawMotion on your local machine:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/MohamedFadl2344/DrawMotion.git
+git clone https://github.com/DMotionX/DrawMotion.git
 cd DrawMotion
 ```
 

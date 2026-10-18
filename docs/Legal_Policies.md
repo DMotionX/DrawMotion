@@ -98,5 +98,5 @@ Our companion web presence ([https://drawmotion-web.vercel.app/](https://drawmot
 For legal questions, bug reports, or partnership inquiries:  
 - **Email:** [easysoft.dv2team@gmail.com](mailto:easysoft.dv2team@gmail.com)  
 - **Facebook:** [https://www.facebook.com/profile.php?id=61592234934862](https://www.facebook.com/profile.php?id=61592234934862)  
-- **GitHub:** [https://github.com/MohamedFadl2344/DrawMotion](https://github.com/MohamedFadl2344/DrawMotion)  
+- **GitHub:** [https://github.com/DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)  
 - **Developer on X:** [https://x.com/MohamedFad19757](https://x.com/MohamedFad19757)

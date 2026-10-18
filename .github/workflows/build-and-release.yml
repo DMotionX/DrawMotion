@@ -154,6 +154,7 @@ jobs:
 
             $signtool = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "signtool.exe" -Recurse | Where-Object { $_.FullName -match "\\x64\\" } | Select-Object -First 1).FullName
             & $signtool sign /f "build_assets\EASY_SOFT_Cert.pfx" /p "${{ secrets.CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 build_out\DrawMotion_Setup.exe
+            Remove-Item -Force "build_assets\EASY_SOFT_Cert.pfx"
           } else {
             Write-Host "Notice: No CERT_BASE64 secret provided. Proceeding with unsigned installer."
           }
