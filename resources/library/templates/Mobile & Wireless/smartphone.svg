@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+<defs>
+    <style>
+        .stroke-main { fill: none; stroke: #2C3E50; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+        .stroke-accent { fill: none; stroke: #3498DB; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+        .stroke-highlight { fill: none; stroke: #E74C3C; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+        .fill-main { fill: #2C3E50; stroke: none; }
+        .fill-accent { fill: #3498DB; stroke: none; }
+        .fill-bg { fill: #ECF0F1; stroke: #2C3E50; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+        .dashed { fill: none; stroke: #7F8C8D; stroke-width: 2; stroke-dasharray: 5,5; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+</defs>
+<rect x="30" y="15" width="40" height="70" rx="8" class="fill-bg" /><rect x="35" y="25" width="30" height="50" rx="2" class="stroke-main" /><circle cx="50" cy="80" r="3" class="fill-main" />
+</svg>

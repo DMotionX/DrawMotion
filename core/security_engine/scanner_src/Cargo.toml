@@ -1,0 +1,10 @@
+[package]
+name = "security_scanner"
+version = "1.0.0"
+edition = "2021"
+authors = ["Mohamed Fadl"]
+description = "A fast and secure standalone string scanner for DrawMotion"
+
+[dependencies]
+unicode-normalization = "0.1.22"
+# But keeping it zero-dependency makes the .exe incredibly small.

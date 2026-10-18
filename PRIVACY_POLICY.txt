@@ -1,0 +1,62 @@
+DrawMotion Privacy Policy (Strictly Local-First)
+
+Last Updated: October 2026
+Official Team Email: easysoft.dv2team@gmail.com
+Official Portal: https://drawmotion-web.vercel.app/
+
+This Privacy Policy explains how DrawMotion ("the Software"), maintained by Mohamed Fadl and the EASY SOFT TEAM ("we", "us", or "our"), handles your privacy and data.
+
+--------------------------------------------------------------------------------
+1. CORE PHILOSOPHY: STRICT LOCAL-FIRST ARCHITECTURE
+--------------------------------------------------------------------------------
+Your creative work, privacy, and sovereignty are paramount. DrawMotion is engineered from the ground up on a strict "Local-First" architecture:
+
+1.1 Zero Data Harvesting
+We do NOT collect, harvest, monitor, sell, or profile your personal information, device data, or creative projects. There are no background analytics, trackers, or behavioral telemetry embedded in the software.
+
+1.2 100% Offline Capable
+DrawMotion functions fully without an active internet connection. All project files (.dm), vector drawing paths, timeline configurations, imported assets (images, audio, fonts), and rendered video animations are processed and stored strictly on your local disk. We have zero access to your projects or assets.
+
+--------------------------------------------------------------------------------
+2. NETWORK COMMUNICATION (UPDATES ONLY)
+--------------------------------------------------------------------------------
+The only automated network communication performed by DrawMotion occurs during software update checks:
+
+2.1 Update Queries
+When checking for updates, DrawMotion makes a secure HTTP GET request to our official release servers (GitHub API / official update endpoint) to retrieve the latest version tag and release changelog.
+
+2.2 Technical Routing Metadata
+Standard hosting providers automatically process technical routing metadata (including incoming IP addresses, HTTP User-Agent strings, and application version headers) as required for operational routing, uptime reliability, and DDoS mitigation.
+
+2.3 Zero Profiling
+We never link this technical routing metadata to any personal identity, nor do we retain, sell, or disclose it for marketing or advertising purposes.
+
+--------------------------------------------------------------------------------
+3. USER SUPPORT & CORRESPONDENCE
+--------------------------------------------------------------------------------
+If you voluntarily contact us via email (easysoft.dv2team@gmail.com) or submit bug reports with attached logs or screenshots:
+- We receive only the technical details and correspondence you choose to share.
+- This information is used strictly and exclusively to diagnose issues and provide technical assistance.
+- We never sell or share your correspondence with any third party.
+
+--------------------------------------------------------------------------------
+4. WEBSITE PRIVACY (NO ADVERTISING / NO TRACKING COOKIES)
+--------------------------------------------------------------------------------
+Our companion web portal (https://drawmotion-web.vercel.app/) operates as an information and documentation portal and does not utilize intrusive third-party advertising cookies, behavioral tracking pixels, or cross-site fingerprinting tools.
+
+--------------------------------------------------------------------------------
+5. GOVERNING LAW
+--------------------------------------------------------------------------------
+This policy shall be governed by and construed in accordance with the laws of the Arab Republic of Egypt.
+
+--------------------------------------------------------------------------------
+6. COPYRIGHT & INQUIRIES
+--------------------------------------------------------------------------------
+Copyright (c) 2026 Mohamed Fadl (EASY SOFT TEAM). All rights reserved.
+
+For any questions, clarifications, or privacy feedback:
+- Email: easysoft.dv2team@gmail.com
+- Official Portal: https://drawmotion-web.vercel.app/
+- GitHub: https://github.com/MohamedFadl2344/DrawMotion
+- Developer on X: https://x.com/MohamedFad19757
+- Facebook: https://www.facebook.com/profile.php?id=61592234934862

@@ -1,0 +1,75 @@
+name: Build Microsoft Store Package (MSIX)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build_msix:
+    name: Build & Package MSIX for Microsoft Store
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install nuitka
+      - name: Clean Local Caches
+        run: |
+          if (Test-Path "assets/uploads") { Remove-Item -Recurse -Force "assets/uploads" }
+          if (Test-Path "assets/library") { Remove-Item -Recurse -Force "assets/library" }
+          if (Test-Path "*.sqlite") { Remove-Item -Force "*.sqlite" }
+
+      - name: Build Standalone with Nuitka
+        run: |
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+
+      - name: Stage MSIX Layout
+        run: |
+          New-Item -ItemType Directory -Path "msix_staging" -Force
+          $distDir = if (Test-Path "dist\main.dist") { "dist\main.dist" } elseif (Test-Path "dist\DrawMotion.dist") { "dist\DrawMotion.dist" } else { "dist\DrawMotion" }
+          Copy-Item -Recurse "$distDir\*" "msix_staging\"
+          Copy-Item "build_assets\msstore\AppxManifest.xml" "msix_staging\"
+          Copy-Item -Recurse "build_assets\msstore\Assets" "msix_staging\"
+
+          # Sync version into manifest
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.8" }
+          $parts = $tag.Split('.')
+          while ($parts.Length -lt 4) { $parts += "0" }
+          $quadVersion = $parts -join '.'
+
+          (Get-Content "msix_staging\AppxManifest.xml") -replace 'Version="[^"]+"', "Version=`"$quadVersion`"" | Set-Content "msix_staging\AppxManifest.xml"
+
+      - name: Pack MSIX with MakeAppx
+        run: |
+          New-Item -ItemType Directory -Path "build_out" -Force
+          $makeappx = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "makeappx.exe" -Recurse | Where-Object { $_.FullName -match "\\x64\\" } | Select-Object -First 1).FullName
+          & $makeappx pack /d "msix_staging" /p "build_out\DrawMotion_Store_x64.msix" /nv /o
+
+      - name: Upload MSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DrawMotion_Store_MSIX
+          path: build_out/DrawMotion_Store_x64.msix
+          retention-days: 14
+
+      - name: Attach to Release (if Tagged)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build_out/DrawMotion_Store_x64.msix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

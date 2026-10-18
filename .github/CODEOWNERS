@@ -1,0 +1,14 @@
+# ==============================================================================
+# DrawMotion Official Code Ownership Specification
+# Lead Engineer & Founder: Mohamed Fadl (@MohamedFadl2344)
+# ==============================================================================
+
+# Global owner for the entire repository:
+# No pull request can be merged without explicit review and approval from Mohamed Fadl.
+* @MohamedFadl2344
+
+# Critical core engines, security modules, and build workflows
+/core/ @MohamedFadl2344
+/main.py @MohamedFadl2344
+/.github/ @MohamedFadl2344
+/build_assets/ @MohamedFadl2344

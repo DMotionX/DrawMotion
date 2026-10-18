@@ -1,0 +1,144 @@
+name: Build and Release DrawMotion (Windows)
+
+on:
+  push:
+    tags:
+      - "v*.*.*" # Triggers when a release tag is pushed (e.g. v1.7.9)
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  developer_build:
+    name: Build Developer Diagnostic Edition (Console Enabled)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install nuitka
+      - name: Clean Local Caches
+        run: |
+          if (Test-Path "assets/uploads") { Remove-Item -Recurse -Force "assets/uploads" }
+          if (Test-Path "assets/library") { Remove-Item -Recurse -Force "assets/library" }
+          if (Test-Path "*.sqlite") { Remove-Item -Force "*.sqlite" }
+
+      - name: Build with Nuitka (Diagnostic Mode)
+        run: |
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=force --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+          if (Test-Path "dist\main.dist") { Rename-Item -Path "dist\main.dist" -NewName "DrawMotion" }
+          elseif (Test-Path "dist\DrawMotion.dist") { Rename-Item -Path "dist\DrawMotion.dist" -NewName "DrawMotion" }
+          Copy-Item -Force "build_assets\Debug_DrawMotion.bat" "dist\DrawMotion\Debug_DrawMotion.bat"
+          Compress-Archive -Path "dist\DrawMotion" -DestinationPath "dist\DrawMotion_DeveloperEdition.zip"
+
+      - name: Upload Developer Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DrawMotion_DeveloperEdition_Zip
+          path: dist/DrawMotion_DeveloperEdition.zip
+          retention-days: 14
+
+      - name: Attach Developer Build to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/DrawMotion_DeveloperEdition.zip
+          prerelease: false
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  production_build:
+    name: Build Production Setup Installer (Console Disabled)
+    runs-on: windows-latest
+    needs: developer_build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install nuitka
+      - name: Clean Local Caches
+        run: |
+          if (Test-Path "assets/uploads") { Remove-Item -Recurse -Force "assets/uploads" }
+          if (Test-Path "assets/library") { Remove-Item -Recurse -Force "assets/library" }
+          if (Test-Path "*.sqlite") { Remove-Item -Force "*.sqlite" }
+
+      - name: Build with Nuitka (Production Mode)
+        run: |
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+          if (Test-Path "dist\main.dist") { Rename-Item -Path "dist\main.dist" -NewName "DrawMotion" }
+          elseif (Test-Path "dist\DrawMotion.dist") { Rename-Item -Path "dist\DrawMotion.dist" -NewName "DrawMotion" }
+
+      - name: Update Installer Version
+        run: |
+          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.8" }
+          (Get-Content build_assets/setup_script_github.iss) -replace '^AppVersion=.*', "AppVersion=$version" | Set-Content build_assets/setup_script_github.iss
+
+      - name: Sync Legal Policies to Installer
+        run: |
+          Copy-Item -Force "docs/Legal_Policies.md" "build_assets/EULA.txt"
+
+      - name: Build Inno Setup Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: build_assets/setup_script_github.iss
+
+      - name: Sign Setup Executable (if Certificate Secret is Present)
+        shell: powershell
+        run: |
+          if ("${{ secrets.CERT_BASE64 }}" -ne "") {
+            Write-Host "Restoring and applying digital code-signing certificate..."
+            $certBytes = [System.Convert]::FromBase64String("${{ secrets.CERT_BASE64 }}")
+            [System.IO.File]::WriteAllBytes("build_assets\EASY_SOFT_Cert.pfx", $certBytes)
+
+            $signtool = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "signtool.exe" -Recurse | Where-Object { $_.FullName -match "\\x64\\" } | Select-Object -First 1).FullName
+            & $signtool sign /f "build_assets\EASY_SOFT_Cert.pfx" /p "${{ secrets.CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 build_out\DrawMotion_Setup.exe
+          } else {
+            Write-Host "Notice: No CERT_BASE64 secret provided. Proceeding with unsigned installer."
+          }
+
+          $ver = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.7.8" }
+          if (-not $ver.StartsWith("v")) { $ver = "v$ver" }
+          Copy-Item build_out\DrawMotion_Setup.exe "build_out\DrawMotion_Setup_$ver.exe"
+
+      - name: Generate SHA-256 Checksum
+        run: |
+          $hash = (Get-FileHash -Path build_out\DrawMotion_Setup.exe -Algorithm SHA256).Hash
+          Set-Content -Path build_out\checksum.txt -Value $hash
+
+      - name: Release Production Installer and Checksum
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build_out/DrawMotion_Setup_*.exe
+            build_out/checksum.txt
+          prerelease: false
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

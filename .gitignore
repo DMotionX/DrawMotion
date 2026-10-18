@@ -1,0 +1,114 @@
+# ==============================================================================
+# DrawMotion - Comprehensive .gitignore (OSS Standard)
+# ==============================================================================
+
+# Python Environments
+venv/
+.venv/
+env/
+ENV/
+.env/
+
+# Python Bytecode and Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.pyc
+target/
+
+# Testing and Coverage Artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# Build, Bundler & Distribution Artifacts
+build/
+dist/
+dist_local/
+dist_nuitka/
+build_out/
+*.spec
+*.dist/
+*.build/
+*.onefile-build/
+*.exe
+!bin/*.exe
+!core/security_engine/bin/*.exe
+!bin/ffmpeg.exe
+!bin/ffprobe.exe
+msix_build/
+msix_staging/
+dist_linux/
+*.msi
+*.msix
+*.appx
+*.appxbundle
+*.msixbundle
+
+# Nuitka Reports and Crash Dumps
+nuitka-crash-report.xml
+*.xml.crash
+plan.json
+plan_output.txt
+
+# Temporary Configuration and Diagnostic Files
+build_config.py
+CRASH_INSPECTION_PLAN.md
+
+# Logs, Crash Handlers, and Local Databases
+*.log
+qt_messages.log
+crash_faulthandler.log
+startup_lifecycle.log
+local_db.sqlite
+*.sqlite
+*.sqlite3
+*.db
+
+# Dynamic User Uploads and Local Asset Library
+assets/uploads/
+assets/library/
+
+# Project Temp Folders
+temp/
+tmp/
+scratch/
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE, Editor, and Tooling Configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.sublime-project
+*.sublime-workspace
+
+# Security, Certificates, and Secret Keys (NEVER COMMIT)
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.keystore
+build_assets/*.pfx
+build_assets/*.p12
+secrets.env
+.env.local
