@@ -22,6 +22,12 @@ jobs:
       - name: Install System Dependencies for Qt6 & Multimedia
         run: |
           sudo apt-get update
+
+          ALSA_PKG="libasound2t64"
+          if ! apt-cache show libasound2t64 >/dev/null 2>&1; then
+            ALSA_PKG="libasound2"
+          fi
+
           sudo apt-get install -y \
             libgl1-mesa-dev \
             libegl1 \
@@ -35,7 +41,7 @@ jobs:
             libxcb-shape0 \
             libxcb-xfixes0 \
             libxcb-xinerama0 \
-            libasound2 \
+            $ALSA_PKG \
             libpulse0 \
             ffmpeg \
             patchelf \
