@@ -5,7 +5,7 @@
   <Identity Name="EASYSOFT.DrawMotion"
             ProcessorArchitecture="x64"
             Publisher="CN=EASY SOFT TEAM"
-            Version="1.7.9.0" />
+            Version="1.7.10.0" />
   <Properties>
     <DisplayName>DrawMotion</DisplayName>
     <PublisherDisplayName>EASY SOFT TEAM</PublisherDisplayName>

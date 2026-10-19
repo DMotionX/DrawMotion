@@ -257,9 +257,15 @@ class SafeRecoveryDialog(QDialog):
         target_path = lifecycle_log if os.path.exists(lifecycle_log) else (crash_log if os.path.exists(crash_log) else log_dir)
         if os.path.exists(target_path):
             try:
-                os.startfile(target_path)
+                from PySide6.QtGui import QDesktopServices
+                from PySide6.QtCore import QUrl
+                QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(target_path)))
             except Exception:
-                pass
+                try:
+                    if hasattr(os, 'startfile'):
+                        os.startfile(target_path)
+                except Exception:
+                    pass
 
     def _handle_try_again(self):
         # Reset attempt count to allow clean attempt

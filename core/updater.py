@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QObject
 from utils.theme import THEME_COLORS
 
 # Current application version
-CURRENT_VERSION = "1.7.9"
+CURRENT_VERSION = "1.7.10"
 
 # Official public open-source repository
 GITHUB_REPO = "DMotionX/DrawMotion"

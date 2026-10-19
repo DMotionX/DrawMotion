@@ -91,17 +91,105 @@ jobs:
           tar -czvf DrawMotion_Linux_x86_64.tar.gz DrawMotion
           cd ..
 
-      - name: Upload Linux Artifact
+      - name: Build Direct Debian Package (.deb)
+        run: |
+          mkdir -p deb_staging/DEBIAN
+          mkdir -p deb_staging/opt/DrawMotion
+          mkdir -p deb_staging/usr/bin
+          mkdir -p deb_staging/usr/share/applications
+          mkdir -p deb_staging/usr/share/icons/hicolor/256x256/apps
+
+          cp -r dist/DrawMotion/* deb_staging/opt/DrawMotion/
+          chmod +x deb_staging/opt/DrawMotion/DrawMotion
+
+          ln -s /opt/DrawMotion/DrawMotion deb_staging/usr/bin/drawmotion
+          cp resources/branding/PNG/DrawMotion_256x256.png deb_staging/usr/share/icons/hicolor/256x256/apps/drawmotion.png
+
+          cat << 'EOF' > deb_staging/usr/share/applications/drawmotion.desktop
+          [Desktop Entry]
+          Name=DrawMotion
+          Comment=Professional Whiteboard Video & Vector Animation Studio
+          Exec=/opt/DrawMotion/DrawMotion %F
+          Icon=drawmotion
+          Terminal=false
+          Type=Application
+          Categories=Graphics;AudioVideo;Video;
+          MimeType=application/x-drawmotion;
+          EOF
+
+          VERSION=${GITHUB_REF_NAME#v}
+          if [ -z "$VERSION" ]; then VERSION="1.7.10"; fi
+
+          cat << EOF > deb_staging/DEBIAN/control
+          Package: drawmotion
+          Version: $VERSION
+          Section: graphics
+          Priority: optional
+          Architecture: amd64
+          Maintainer: EASY SOFT TEAM <easysoft.dv2team@gmail.com>
+          Description: Professional Open-Source Whiteboard Video & Vector Animation Studio
+          EOF
+
+          dpkg-deb --build --root-owner-group deb_staging dist/DrawMotion_${VERSION}_amd64.deb
+          cp dist/DrawMotion_${VERSION}_amd64.deb dist/DrawMotion_amd64.deb
+
+      - name: Build Direct Standalone AppImage
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp -r dist/DrawMotion/* AppDir/usr/bin/
+          chmod +x AppDir/usr/bin/DrawMotion
+
+          cp resources/branding/PNG/DrawMotion_256x256.png AppDir/drawmotion.png
+          cp resources/branding/PNG/DrawMotion_256x256.png AppDir/usr/share/icons/hicolor/256x256/apps/drawmotion.png
+
+          cat << 'EOF' > AppDir/drawmotion.desktop
+          [Desktop Entry]
+          Name=DrawMotion
+          Comment=Professional Whiteboard Video & Vector Animation Studio
+          Exec=DrawMotion %F
+          Icon=drawmotion
+          Terminal=false
+          Type=Application
+          Categories=Graphics;AudioVideo;
+          EOF
+
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          export QT_PLUGIN_PATH="${HERE}/usr/bin"
+          export QT_QPA_PLATFORM="xcb;wayland"
+          exec "${HERE}/usr/bin/DrawMotion" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
+          chmod +x appimagetool.AppImage
+          ./appimagetool.AppImage --appimage-extract
+          ARCH=x86_64 ./squashfs-root/AppRun AppDir dist/DrawMotion-x86_64.AppImage
+          chmod +x dist/DrawMotion-x86_64.AppImage
+
+      - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DrawMotion_Linux_x86_64
-          path: dist/DrawMotion_Linux_x86_64.tar.gz
+          name: DrawMotion_Linux_Packages
+          path: |
+            dist/DrawMotion-x86_64.AppImage
+            dist/DrawMotion_amd64.deb
+            dist/DrawMotion_Linux_x86_64.tar.gz
           retention-days: 14
 
-      - name: Attach to Release (if Tagged)
+      - name: Attach Packages to Release (if Tagged)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/DrawMotion_Linux_x86_64.tar.gz
+          files: |
+            dist/DrawMotion-x86_64.AppImage
+            dist/DrawMotion_amd64.deb
+            dist/DrawMotion_Linux_x86_64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

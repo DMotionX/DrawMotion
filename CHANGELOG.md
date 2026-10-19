@@ -6,6 +6,27 @@ This project adheres to Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [1.7.10] - 2026-10-19
+
+### Multi-Platform Packaging Expansion, Direct Linux Installers & XML Staging Fix
+
+This release expands cross-platform Linux delivery with direct, uncompressed installers (`AppImage` and `.deb`), resolves the Microsoft Store MakeAppx XML syntax error, excludes developer artifacts from release channels, and enforces hermetic isolation between development and production environments.
+
+#### Linux Direct Distribution Packages
+* **Universal Standalone AppImage (`DrawMotion-x86_64.AppImage`):** Automated creation of a single-file, zero-extraction executable bundle running directly across all major Linux distributions (Ubuntu, Debian, Fedora, Arch, Mint, openSUSE).
+* **Native Debian/Ubuntu Package (`DrawMotion_amd64.deb`):** Generated a direct installer package with automated system menu registration, desktop icons (`/usr/share/applications/drawmotion.desktop`), and standard `/opt/DrawMotion` directory deployment.
+* **Universal System Call Abstraction:** Replaced Windows-exclusive `os.startfile` with Qt's `QDesktopServices.openUrl` in recovery dialogs, ensuring crash and diagnostic logs open natively on Linux desktops.
+
+#### CI/CD Pipeline & Packaging Fixes
+* **MSIX Manifest XML Declaration Integrity:** Replaced case-insensitive PowerShell replacement with targeted .NET regex and UTF-8 encoding in `.github/workflows/build-msstore.yml`, preserving the mandatory W3C `<?xml version="1.0" encoding="utf-8"?>` declaration and eliminating MakeAppx error `C00CEE40`.
+* **Public Release Stream Sanitization:** Excluded developer diagnostic ZIP archive (`DrawMotion_DeveloperEdition.zip`) from public release assets to prevent user confusion and maintain clean release channels.
+
+#### Core Engine & Environment Isolation
+* **Hermetic Dev/Prod Isolation:** Hardened `utils.paths.is_frozen_build()` to reliably detect compiled runtime environments using `builtins.__compiled__`, `sys.__nuitka_version__`, and executable inspections, permanently preventing user asset and database leakage between `DrawMotion-Dev` and `DrawMotion`.
+* **Runtime Version Synchronization:** Synchronized version `1.7.10` across `core/updater.py`, `core/serialization/serializer.py`, Inno Setup scripts, and Microsoft Store manifests.
+
+---
+
 ## [1.7.9] - 2026-10-19
 
 ### CI/CD Packaging Pipeline Hardening & Multi-Platform Compatibility
