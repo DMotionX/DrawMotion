@@ -59,9 +59,11 @@ nuitka-crash-report.xml
 plan.json
 plan_output.txt
 
-# Temporary Configuration and Diagnostic Files
+# Temporary Configuration, Diagnostic, and Local Files (Local Only)
 build_config.py
 CRASH_INSPECTION_PLAN.md
+build_diagnostic_local.bat
+fixed_install.md
 
 # Logs, Crash Handlers, and Local Databases
 *.log
