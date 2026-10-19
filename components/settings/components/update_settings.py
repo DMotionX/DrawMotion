@@ -21,9 +21,9 @@ OFFICIAL_LINKS = [
     },
     {
         "title": "GitHub",
-        "subtitle": "MohamedFadl2344",
+        "subtitle": "DMotionX/DrawMotion",
         "icon": "github",
-        "url": "https://github.com/MohamedFadl2344"
+        "url": "https://github.com/DMotionX/DrawMotion"
     },
     {
         "title": "Facebook",

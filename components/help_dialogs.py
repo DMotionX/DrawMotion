@@ -733,7 +733,7 @@ class LegalPoliciesDialog(QDialog):
         
         header_layout.addStretch()
         
-        badge_lbl = QLabel(f"v{CURRENT_VERSION} • Closed-Source Freeware")
+        badge_lbl = QLabel(f"v{CURRENT_VERSION} • Free & Open Source (GNU GPLv3)")
         badge_lbl.setStyleSheet("""
             background-color: #17261F;
             border: 1px solid #274234;
@@ -836,13 +836,14 @@ class LegalPoliciesDialog(QDialog):
             "- You are completely free to monetize your creations on YouTube, TikTok, Facebook, social media, commercial advertising, or client freelance contracts.\n"
             "- **Zero Royalties:** You do not owe any licensing fees, royalties, or revenue share to EASY SOFT TEAM.\n"
             "- Attribution is appreciated but never mandatory for commercial works.\n\n"
-            "### 3. Software Distribution & Commercial Restrictions\n"
-            "While your creative output is unrestricted, the DrawMotion software application itself is proprietary freeware subject to the following limitations:\n"
-            "- **No Selling or Renting:** You may not sell, resell, rent, lease, sublicense, or charge any fee for the DrawMotion software, whether standalone or bundled.\n"
-            "- **No Unauthorized Packaging:** You may not repackage DrawMotion into third-party installers, adware bundles, or commercial software suites.\n"
-            "- **No Hosted Cloud Services:** You may not offer DrawMotion as a hosted remote service, cloud subscription, or time-shared software-as-a-service (SaaS) without explicit written permission from the author.\n\n"
-            "### 4. Proprietary Core & LGPLv3 Carve-Out\n"
-            "DrawMotion's proprietary application source code (including custom vector planning algorithms, timeline synchronization engine, and rendering pipelines) is owned by Mohamed Fadl.\n\n"
+            "### 3. Free & Open-Source Software (GNU GPLv3)\n"
+            "DrawMotion is licensed under the **GNU General Public License v3.0 (GPLv3)**.\n"
+            "- You are free to inspect, fork, modify, and contribute to DrawMotion's source code: https://github.com/DMotionX/DrawMotion\n"
+            "- Any derivative works or modifications you distribute must also be published under GPLv3.\n"
+            "- **No Selling or Renting:** You may not repackage DrawMotion into adware bundles, malware wrappers, or deceptive commercial installers.\n"
+            "- **No Unauthorized Cloud Hosting:** You may not offer DrawMotion as a paid SaaS subscription without explicit written permission from the author.\n\n"
+            "### 4. LGPLv3 Qt Carve-Out\n"
+            "In compliance with the GNU Lesser General Public License (LGPLv3) governing Qt 6 and PySide6, you retain the right to modify or replace the dynamically linked Qt/PySide6 shared libraries with your own compatible versions.\n\n"
             "**Open-Source LGPL Exception:**\n"
             "In compliance with the GNU Lesser General Public License (LGPLv3) governing Qt 6 and PySide6, you retain the right to modify or replace the dynamically linked Qt/PySide6 shared libraries (.dll, .pyd) with your own compatible versions.\n\n"
             "### 5. Code Signing & Antivirus Transparency\n"

@@ -6,6 +6,27 @@ This project adheres to Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [1.7.11] - 2026-10-19
+
+### Microsoft Store Publishing Alignment, Open-Source Purge & Author Governance
+
+This release aligns the MSIX packaging manifest and application UI with the official Microsoft Partner Center individual developer identity, provisions the standard Privacy Policy required for `runFullTrust` capability, introduces centralized author governance, and purges all legacy closed-source labeling from the application.
+
+#### Microsoft Store & MSIX
+* **Privacy Policy Provisioned (`PRIVACY.md`):** Added a standards-compliant, zero-telemetry privacy policy to satisfy the mandatory Microsoft Store `runFullTrust` capability requirement. Policy is accessible at `https://github.com/DMotionX/DrawMotion/blob/main/PRIVACY.md`.
+* **Microsoft Store Identity Alignment:** Updated `build_assets/msstore/AppxManifest.xml` with the official `Package/Identity/Name` and `Package/Identity/Publisher` values issued by Microsoft Partner Center, enabling the unsigned MSIX to pass identity validation upon submission.
+* **MSIX Checksum:** Extended `.github/workflows/build-msstore.yml` to generate and attach a dedicated `checksum_msstore.txt` (SHA-256) for the Store package.
+
+#### Open-Source Brand & Legal Purge
+* **Removed "Closed-Source Freeware" Labels:** Updated in-app legal dialog (`components/help_dialogs.py`) to replace the legacy `Closed-Source Freeware` badge and proprietary EULA language with the accurate `Free & Open Source (GNU GPLv3)` designation.
+* **GitHub Link Modernization:** Updated the official GitHub social tile in the Settings → Updates hub (`components/settings/components/update_settings.py`) to point to the authoritative open-source repository: `https://github.com/DMotionX/DrawMotion`.
+
+#### Author Governance & Legal Protection
+* **Centralized Author Governance (`AUTHORS`):** Added a top-level `AUTHORS` file establishing full legal authorship coverage for the entire repository tree under GPLv3, documenting Mohamed Fadl as Founder & Lead Architect and EASY SOFT TEAM as the contributing community. This single-file approach protects all source files without requiring per-file modification.
+* **Runtime Version Synchronization:** Synchronized version `1.7.11` across `core/updater.py`, `core/serialization/serializer.py`, Inno Setup scripts, and Microsoft Store manifests.
+
+---
+
 ## [1.7.10] - 2026-10-19
 
 ### Multi-Platform Packaging Expansion, Direct Linux Installers & XML Staging Fix

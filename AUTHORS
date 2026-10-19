@@ -1,0 +1,43 @@
+DrawMotion Studio
+Copyright (C) 2026 Mohamed Fadl & EASY SOFT TEAM. All rights reserved.
+
+Official Repository: https://github.com/DMotionX/DrawMotion
+Official Website:    https://drawmotion-web.vercel.app/
+Official Email:      easysoft.dv2team@gmail.com
+Official Facebook:   https://www.facebook.com/profile.php?id=61592234934862
+
+Lead Architect & Founder:  Mohamed Fadl <easysoft.dv2team@gmail.com>
+                            @MohamedFad19757 on X / Twitter
+                            GitHub: https://github.com/MohamedFadl2344
+
+Contributing Community:    EASY SOFT TEAM — Beta testers & open contributors
+
+────────────────────────────────────────────────────────────────────────
+
+License: GNU General Public License v3.0 (GPL-3.0-or-later)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+────────────────────────────────────────────────────────────────────────
+
+THIRD-PARTY NOTICES
+
+This product bundles or links against the following open-source libraries:
+
+  * Qt 6 & PySide6     — GNU LGPL v3    — https://code.qt.io
+  * FFmpeg              — LGPL / GPL     — https://ffmpeg.org
+  * NumPy               — BSD License    — https://numpy.org
+  * SciPy               — BSD License    — https://scipy.org
+  * OpenCV              — Apache 2.0     — https://opencv.org
+  * Python Runtime      — PSF License    — https://python.org
