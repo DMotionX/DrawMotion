@@ -1,7 +1,7 @@
 [Setup]
 SourceDir=..
 AppName=DrawMotion
-AppVersion=1.7.8
+AppVersion=1.7.9
 AppPublisher=EASY SOFT TEAM (Mohamed Fadl)
 AppPublisherURL=https://github.com/DMotionX/DrawMotion
 AppSupportURL=https://drawmotion-web.vercel.app/

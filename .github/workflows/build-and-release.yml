@@ -132,7 +132,7 @@ jobs:
 
       - name: Update Installer Version
         run: |
-          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.8" }
+          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.9" }
           (Get-Content build_assets/setup_script_github.iss) -replace '^AppVersion=.*', "AppVersion=$version" | Set-Content build_assets/setup_script_github.iss
 
       - name: Sync Legal Policies to Installer
@@ -159,7 +159,7 @@ jobs:
             Write-Host "Notice: No CERT_BASE64 secret provided. Proceeding with unsigned installer."
           }
 
-          $ver = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.7.8" }
+          $ver = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.7.9" }
           if (-not $ver.StartsWith("v")) { $ver = "v$ver" }
           Copy-Item build_out\DrawMotion_Setup.exe "build_out\DrawMotion_Setup_$ver.exe"
 

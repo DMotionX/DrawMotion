@@ -61,10 +61,13 @@ jobs:
           $distDir = if (Test-Path "dist\main.dist") { "dist\main.dist" } elseif (Test-Path "dist\DrawMotion.dist") { "dist\DrawMotion.dist" } else { "dist\DrawMotion" }
           Copy-Item -Recurse "$distDir\*" "msix_staging\"
           Copy-Item "build_assets\msstore\AppxManifest.xml" "msix_staging\"
-          Copy-Item -Recurse "build_assets\msstore\Assets" "msix_staging\"
+          if (-not (Test-Path "msix_staging\Assets")) {
+            New-Item -ItemType Directory -Path "msix_staging\Assets" -Force
+          }
+          Copy-Item -Path "build_assets\msstore\Assets\*" -Destination "msix_staging\Assets\" -Recurse -Force
 
           # Sync version into manifest
-          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.8" }
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.9" }
           $parts = $tag.Split('.')
           while ($parts.Length -lt 4) { $parts += "0" }
           $quadVersion = $parts -join '.'
