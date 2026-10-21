@@ -1,7 +1,8 @@
+import math
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
 from PySide6.QtCore import Qt, QRectF, QPointF, Property, Signal, QThread
-from PySide6.QtGui import QPainter, QPen, QColor, QImage, QPixmap
+from PySide6.QtGui import QPainter, QPen, QColor, QImage, QPixmap, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 
 # We reuse the stable Solid Reveal worker from the image engine to satisfy the 'Zero Risk' policy
@@ -435,20 +436,20 @@ class SVGCanvasItem(QGraphicsSvgItem):
         br = self.boundingRect()
         painter.drawRect(br)
 
-        painter.setBrush(QColor(255, 255, 255))
-        h_pen = QPen(QColor(33, 150, 243))
+        painter.setBrush(QColor("#FFFFFF"))
+        h_pen = QPen(QColor("#2196F3"))
         h_pen.setWidth(1)
         h_pen.setCosmetic(True)
         painter.setPen(h_pen)
         
         hs = 8 / self.scale() if self.scale() != 0 else 8
-        for rx, ry in [
+        for cx, cy in [
             (br.left(), br.top()), 
-            (br.right()-hs, br.top()),
-            (br.left(), br.bottom()-hs), 
-            (br.right()-hs, br.bottom()-hs)
+            (br.right(), br.top()),
+            (br.left(), br.bottom()), 
+            (br.right(), br.bottom())
         ]:
-            painter.drawRect(QRectF(rx, ry, hs, hs))
+            painter.drawRect(QRectF(cx - hs/2, cy - hs/2, hs, hs))
             
         painter.restore()
 
@@ -492,51 +493,91 @@ class SVGCanvasItem(QGraphicsSvgItem):
 
     # ── Interactive Resizing ──────────────────────────────────────────────────
 
+    def shape(self):
+        path = QPainterPath()
+        s = self.scale() if self.scale() > 0 else 1.0
+        pad = 20.0 / s
+        path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
+        return path
+
     def hoverMoveEvent(self, event):
         pos = event.pos()
         br = self.boundingRect()
-        hs = 12 / self.scale() if self.scale() != 0 else 12
+        s = self.scale() if self.scale() > 0 else 1.0
+        hs = 20.0 / s
         
-        tl = QRectF(br.left()-hs, br.top()-hs, hs*2, hs*2)
-        tr = QRectF(br.right()-hs, br.top()-hs, hs*2, hs*2)
-        bl = QRectF(br.left()-hs, br.bottom()-hs, hs*2, hs*2)
-        br_rect = QRectF(br.right()-hs, br.bottom()-hs, hs*2, hs*2)
+        tl = QRectF(br.left() - hs, br.top() - hs, hs * 2, hs * 2)
+        tr = QRectF(br.right() - hs, br.top() - hs, hs * 2, hs * 2)
+        bl = QRectF(br.left() - hs, br.bottom() - hs, hs * 2, hs * 2)
+        br_rect = QRectF(br.right() - hs, br.bottom() - hs, hs * 2, hs * 2)
 
-        if tl.contains(pos) or br_rect.contains(pos):
+        if tl.contains(pos):
             self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-            self._resize_dir = "FDiag"
-        elif tr.contains(pos) or bl.contains(pos):
+            self._hover_handle = "TL"
+        elif br_rect.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+            self._hover_handle = "BR"
+        elif tr.contains(pos):
             self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-            self._resize_dir = "BDiag"
+            self._hover_handle = "TR"
+        elif bl.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+            self._hover_handle = "BL"
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
-            self._resize_dir = None
+            self._hover_handle = None
         super().hoverMoveEvent(event)
 
     def mousePressEvent(self, event):
-        if getattr(self, "_resize_dir", None):
+        handle = getattr(self, "_hover_handle", None)
+        if handle and event.button() == Qt.MouseButton.LeftButton:
             self._is_resizing = True
+            self._active_handle = handle
             self._resize_start_pos = event.scenePos()
             self._resize_start_scale = self.scale()
+            
+            br = self.boundingRect()
+            if handle == "TL":
+                anchor_item = br.bottomRight()
+            elif handle == "TR":
+                anchor_item = br.bottomLeft()
+            elif handle == "BL":
+                anchor_item = br.topRight()
+            else: # "BR"
+                anchor_item = br.topLeft()
+                
+            self._resize_anchor_item = anchor_item
+            self._resize_anchor_scene = self.mapToScene(anchor_item)
+            
+            initial_vec = self._resize_start_pos - self._resize_anchor_scene
+            self._resize_initial_dist = max(10.0, math.hypot(initial_vec.x(), initial_vec.y()))
+            self._resize_initial_vec = initial_vec
             event.accept()
         else:
+            self._is_resizing = False
+            self._active_handle = None
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if getattr(self, "_is_resizing", False):
-            dy = event.scenePos().y() - self._resize_start_pos.y()
-            dx = event.scenePos().x() - self._resize_start_pos.x()
+        if getattr(self, "_is_resizing", False) and getattr(self, "_active_handle", None):
+            anchor_scene = self._resize_anchor_scene
+            cur_vec = event.scenePos() - anchor_scene
+            cur_dist = math.hypot(cur_vec.x(), cur_vec.y())
             
-            dist = (dy + dx) / 2.0
-            scale_change = dist / max(10.0, self.boundingRect().height())
+            init_vec = self._resize_initial_vec
+            dot = (cur_vec.x() * init_vec.x() + cur_vec.y() * init_vec.y())
             
-            if self._resize_start_pos.y() < self.scenePos().y():
-                scale_change = -scale_change
+            if dot <= 0:
+                scale_factor = 0.05 / max(0.01, self._resize_start_scale)
+            else:
+                scale_factor = cur_dist / max(10.0, self._resize_initial_dist)
                 
-            new_scale = max(0.05, self._resize_start_scale + scale_change)
-            
-            self.setTransformOriginPoint(self.boundingRect().center())
+            new_scale = max(0.05, min(15.0, self._resize_start_scale * scale_factor))
             self.setScale(new_scale)
+            
+            new_anchor_scene = self.mapToScene(self._resize_anchor_item)
+            shift = new_anchor_scene - anchor_scene
+            self.setPos(self.pos() - shift)
             
             self.update()
             event.accept()
@@ -546,6 +587,13 @@ class SVGCanvasItem(QGraphicsSvgItem):
     def mouseReleaseEvent(self, event):
         if getattr(self, "_is_resizing", False):
             self._is_resizing = False
+            self._active_handle = None
+            if self.scene() and hasattr(self.scene(), 'parent'):
+                parent_ws = self.scene().parent()
+                if hasattr(parent_ws, 'item_selected'):
+                    parent_ws.item_selected.emit(self)
+                if hasattr(parent_ws, 'items_changed'):
+                    parent_ws.items_changed.emit(parent_ws.user_items)
             event.accept()
         else:
             super().mouseReleaseEvent(event)
