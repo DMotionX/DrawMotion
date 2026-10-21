@@ -443,12 +443,19 @@ class SVGCanvasItem(QGraphicsSvgItem):
         painter.setPen(h_pen)
         
         hs = 8 / self.scale() if self.scale() != 0 else 8
-        for cx, cy in [
-            (br.left(), br.top()), 
-            (br.right(), br.top()),
-            (br.left(), br.bottom()), 
-            (br.right(), br.bottom())
-        ]:
+        mid_x = (br.left() + br.right()) / 2.0
+        mid_y = (br.top() + br.bottom()) / 2.0
+        handles = [
+            (br.left(), br.top()),       # TL
+            (mid_x, br.top()),           # TC
+            (br.right(), br.top()),      # TR
+            (br.right(), mid_y),         # RC
+            (br.right(), br.bottom()),   # BR
+            (mid_x, br.bottom()),        # BC
+            (br.left(), br.bottom()),    # BL
+            (br.left(), mid_y)           # LC
+        ]
+        for cx, cy in handles:
             painter.drawRect(QRectF(cx - hs/2, cy - hs/2, hs, hs))
             
         painter.restore()
@@ -496,7 +503,7 @@ class SVGCanvasItem(QGraphicsSvgItem):
     def shape(self):
         path = QPainterPath()
         s = self.scale() if self.scale() > 0 else 1.0
-        pad = 20.0 / s
+        pad = 24.0 / s
         path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
         return path
 
@@ -504,12 +511,22 @@ class SVGCanvasItem(QGraphicsSvgItem):
         pos = event.pos()
         br = self.boundingRect()
         s = self.scale() if self.scale() > 0 else 1.0
-        hs = 20.0 / s
+        hs = 24.0 / s
         
+        mid_x = (br.left() + br.right()) / 2.0
+        mid_y = (br.top() + br.bottom()) / 2.0
+        
+        # 4 Corner hitboxes
         tl = QRectF(br.left() - hs, br.top() - hs, hs * 2, hs * 2)
         tr = QRectF(br.right() - hs, br.top() - hs, hs * 2, hs * 2)
         bl = QRectF(br.left() - hs, br.bottom() - hs, hs * 2, hs * 2)
         br_rect = QRectF(br.right() - hs, br.bottom() - hs, hs * 2, hs * 2)
+
+        # 4 Edge midpoint hitboxes
+        tc = QRectF(mid_x - hs, br.top() - hs, hs * 2, hs * 2)
+        bc = QRectF(mid_x - hs, br.bottom() - hs, hs * 2, hs * 2)
+        lc = QRectF(br.left() - hs, mid_y - hs, hs * 2, hs * 2)
+        rc = QRectF(br.right() - hs, mid_y - hs, hs * 2, hs * 2)
 
         if tl.contains(pos):
             self.setCursor(Qt.CursorShape.SizeFDiagCursor)
@@ -523,6 +540,30 @@ class SVGCanvasItem(QGraphicsSvgItem):
         elif bl.contains(pos):
             self.setCursor(Qt.CursorShape.SizeBDiagCursor)
             self._hover_handle = "BL"
+        elif tc.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+            self._hover_handle = "TC"
+        elif bc.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+            self._hover_handle = "BC"
+        elif lc.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            self._hover_handle = "LC"
+        elif rc.contains(pos):
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            self._hover_handle = "RC"
+        elif abs(pos.y() - br.top()) <= hs/2 and (br.left() <= pos.x() <= br.right()):
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+            self._hover_handle = "TC"
+        elif abs(pos.y() - br.bottom()) <= hs/2 and (br.left() <= pos.x() <= br.right()):
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+            self._hover_handle = "BC"
+        elif abs(pos.x() - br.left()) <= hs/2 and (br.top() <= pos.y() <= br.bottom()):
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            self._hover_handle = "LC"
+        elif abs(pos.x() - br.right()) <= hs/2 and (br.top() <= pos.y() <= br.bottom()):
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            self._hover_handle = "RC"
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
             self._hover_handle = None
@@ -537,14 +578,25 @@ class SVGCanvasItem(QGraphicsSvgItem):
             self._resize_start_scale = self.scale()
             
             br = self.boundingRect()
+            mid_x = (br.left() + br.right()) / 2.0
+            mid_y = (br.top() + br.bottom()) / 2.0
+            
             if handle == "TL":
                 anchor_item = br.bottomRight()
             elif handle == "TR":
                 anchor_item = br.bottomLeft()
             elif handle == "BL":
                 anchor_item = br.topRight()
-            else: # "BR"
+            elif handle == "BR":
                 anchor_item = br.topLeft()
+            elif handle == "TC":
+                anchor_item = QPointF(mid_x, br.bottom())
+            elif handle == "BC":
+                anchor_item = QPointF(mid_x, br.top())
+            elif handle == "LC":
+                anchor_item = QPointF(br.right(), mid_y)
+            else: # "RC"
+                anchor_item = QPointF(br.left(), mid_y)
                 
             self._resize_anchor_item = anchor_item
             self._resize_anchor_scene = self.mapToScene(anchor_item)

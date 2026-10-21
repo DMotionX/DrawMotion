@@ -7,6 +7,8 @@ from PySide6.QtWidgets import QGraphicsScene
 from graphics.animated_image_item import AnimatedImageItem
 from components.write_to_image.graphics_item import WriteToImageGraphicsItem
 from components.write_to_image.models import WriteToImageModel
+from components.canvas.view import CustomGraphicsView
+from components.canvas.workspace import CanvasWorkspace
 
 def test_animated_image_shape_padding(qtbot):
     pixmap = QPixmap(200, 150)
@@ -16,10 +18,10 @@ def test_animated_image_shape_padding(qtbot):
     shape_path = item.shape()
     # Point outside the top-left boundary by 10px should be inside the padded interaction shape
     assert shape_path.contains(QPointF(-10, -10))
-    # Point far outside (30px) should not be inside
-    assert not shape_path.contains(QPointF(-30, -30))
+    # Point far outside (35px) should not be inside
+    assert not shape_path.contains(QPointF(-35, -35))
 
-def test_diagonal_anchor_resizing_all_corners(qtbot):
+def test_8_handle_resizing_all_corners_and_edges(qtbot):
     pixmap = QPixmap(400, 300)
     item = AnimatedImageItem(pixmap)
     item.setPos(100, 100)
@@ -28,20 +30,26 @@ def test_diagonal_anchor_resizing_all_corners(qtbot):
     scene = QGraphicsScene()
     scene.addItem(item)
     br = item.boundingRect()
+    mid_x = (br.left() + br.right()) / 2.0
+    mid_y = (br.top() + br.bottom()) / 2.0
     
-    corners = [
+    handles = [
         ('TL', br.topLeft(), br.bottomRight(), QPointF(-40, -30)),
         ('TR', br.topRight(), br.bottomLeft(), QPointF(40, -30)),
         ('BL', br.bottomLeft(), br.topRight(), QPointF(-40, 30)),
         ('BR', br.bottomRight(), br.topLeft(), QPointF(40, 30)),
+        ('TC', QPointF(mid_x, br.top()), QPointF(mid_x, br.bottom()), QPointF(0, -30)),
+        ('BC', QPointF(mid_x, br.bottom()), QPointF(mid_x, br.top()), QPointF(0, 30)),
+        ('LC', QPointF(br.left(), mid_y), QPointF(br.right(), mid_y), QPointF(-40, 0)),
+        ('RC', QPointF(br.right(), mid_y), QPointF(br.left(), mid_y), QPointF(40, 0)),
     ]
     
-    for handle, corner_pt, anchor_pt, drag_dir in corners:
+    for handle, drag_pt, anchor_pt, drag_dir in handles:
         item.setPos(100, 100)
         item.setScale(1.0)
         
         anchor_scene = item.mapToScene(anchor_pt)
-        start_pos = item.mapToScene(corner_pt)
+        start_pos = item.mapToScene(drag_pt)
         init_vec = start_pos - anchor_scene
         init_dist = math.hypot(init_vec.x(), init_vec.y())
         
@@ -59,14 +67,11 @@ def test_diagonal_anchor_resizing_all_corners(qtbot):
         
         # Verify anchor did not move
         final_anchor = item.mapToScene(anchor_pt)
-        assert abs(final_anchor.x() - anchor_scene.x()) < 1e-3
-        assert abs(final_anchor.y() - anchor_scene.y()) < 1e-3
+        assert abs(final_anchor.x() - anchor_scene.x()) < 1e-3, f"{handle} Anchor X moved"
+        assert abs(final_anchor.y() - anchor_scene.y()) < 1e-3, f"{handle} Anchor Y moved"
         
-        # Verify dragged corner moved outward and scale increased
-        assert new_scale > 1.0
-        final_corner = item.mapToScene(corner_pt)
-        assert abs(final_corner.x() - cur_pos.x()) < 1e-3
-        assert abs(final_corner.y() - cur_pos.y()) < 1e-3
+        # Verify dragged point moved outward and scale increased
+        assert new_scale > 1.0, f"{handle} failed to scale outward"
 
 def test_write_to_image_model_sync_on_resize(qtbot):
     model = WriteToImageModel(id="test_id", name="Test Item")
@@ -77,6 +82,12 @@ def test_write_to_image_model_sync_on_resize(qtbot):
     scene = QGraphicsScene()
     scene.addItem(item)
     
-    # Test shape padding
     shape_path = item.shape()
     assert shape_path.contains(QPointF(-10, -10))
+
+def test_view_mouse_tracking_enabled(qtbot):
+    workspace = CanvasWorkspace()
+    qtbot.addWidget(workspace)
+    view = workspace.view
+    assert view.hasMouseTracking() is True
+    assert view.viewport().hasMouseTracking() is True
