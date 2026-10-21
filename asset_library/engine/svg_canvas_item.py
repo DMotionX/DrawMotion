@@ -503,7 +503,7 @@ class SVGCanvasItem(QGraphicsSvgItem):
     def shape(self):
         path = QPainterPath()
         s = self.scale() if self.scale() > 0 else 1.0
-        pad = 15.0 / s
+        pad = 14.0 / s
         path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
         return path
 
@@ -511,57 +511,73 @@ class SVGCanvasItem(QGraphicsSvgItem):
         pos = event.pos()
         br = self.boundingRect()
         s = self.scale() if self.scale() > 0 else 1.0
-        hs = 12.0 / s
         
-        mid_x = (br.left() + br.right()) / 2.0
-        mid_y = (br.top() + br.bottom()) / 2.0
+        # Responsive edge and corner margins
+        edge_margin = 12.0 / s
+        corner_reach = 24.0 / s
         
-        # Hysteresis damping buffer (+3px) prevents micro-flicker on the handle boundaries
-        cur = getattr(self, "_hover_handle", None)
-        buf = 3.0 / s
-        def _rect(cx, cy, name):
-            r = hs + (buf if cur == name else 0.0)
-            return QRectF(cx - r, cy - r, r * 2, r * 2)
+        min_dim = min(br.width(), br.height())
+        if min_dim > 0:
+            edge_margin = min(edge_margin, min_dim * 0.35)
+            corner_reach = min(corner_reach, min_dim * 0.45)
+            
+        x, y = pos.x(), pos.y()
+        left, top, right, bottom = br.left(), br.top(), br.right(), br.bottom()
+        
+        # Check boundary proximity (Resize Zone)
+        near_left = abs(x - left) <= edge_margin
+        near_right = abs(x - right) <= edge_margin
+        near_top = abs(y - top) <= edge_margin
+        near_bottom = abs(y - bottom) <= edge_margin
+        
+        outside_left = (x < left)
+        outside_right = (x > right)
+        outside_top = (y < top)
+        outside_bottom = (y > bottom)
+        
+        is_on_edge = (near_left or near_right or near_top or near_bottom or
+                      outside_left or outside_right or outside_top or outside_bottom)
 
-        # 4 Corner hitboxes
-        tl = _rect(br.left(), br.top(), "TL")
-        tr = _rect(br.right(), br.top(), "TR")
-        bl = _rect(br.left(), br.bottom(), "BL")
-        br_rect = _rect(br.right(), br.bottom(), "BR")
+        if is_on_edge:
+            # 1. Corners (TL, TR, BL, BR) take top priority
+            is_top_corner = (y <= top + corner_reach)
+            is_bottom_corner = (y >= bottom - corner_reach)
+            is_left_corner = (x <= left + corner_reach)
+            is_right_corner = (x >= right - corner_reach)
 
-        # 4 Edge midpoint hitboxes
-        tc = _rect(mid_x, br.top(), "TC")
-        bc = _rect(mid_x, br.bottom(), "BC")
-        lc = _rect(br.left(), mid_y, "LC")
-        rc = _rect(br.right(), mid_y, "RC")
-
-        if tl.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-            self._hover_handle = "TL"
-        elif br_rect.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-            self._hover_handle = "BR"
-        elif tr.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-            self._hover_handle = "TR"
-        elif bl.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-            self._hover_handle = "BL"
-        elif tc.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
-            self._hover_handle = "TC"
-        elif bc.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
-            self._hover_handle = "BC"
-        elif lc.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-            self._hover_handle = "LC"
-        elif rc.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-            self._hover_handle = "RC"
+            if (is_left_corner and is_top_corner) or (near_left and is_top_corner) or (near_top and is_left_corner):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                self._hover_handle = "TL"
+            elif (is_right_corner and is_bottom_corner) or (near_right and is_bottom_corner) or (near_bottom and is_right_corner):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                self._hover_handle = "BR"
+            elif (is_right_corner and is_top_corner) or (near_right and is_top_corner) or (near_top and is_right_corner):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                self._hover_handle = "TR"
+            elif (is_left_corner and is_bottom_corner) or (near_left and is_bottom_corner) or (near_bottom and is_left_corner):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                self._hover_handle = "BL"
+            # 2. Side edges (Top, Bottom, Left, Right)
+            elif near_top or (outside_top and left <= x <= right):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+                self._hover_handle = "TC"
+            elif near_bottom or (outside_bottom and left <= x <= right):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+                self._hover_handle = "BC"
+            elif near_left or (outside_left and top <= y <= bottom):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+                self._hover_handle = "LC"
+            elif near_right or (outside_right and top <= y <= bottom):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+                self._hover_handle = "RC"
+            else:
+                self.setCursor(Qt.CursorShape.OpenHandCursor)
+                self._hover_handle = None
         else:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+            # Deep inside image -> Move/Grab zone ("المقبض")
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
             self._hover_handle = None
+
         super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event):
@@ -608,6 +624,8 @@ class SVGCanvasItem(QGraphicsSvgItem):
         else:
             self._is_resizing = False
             self._active_handle = None
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -649,6 +667,8 @@ class SVGCanvasItem(QGraphicsSvgItem):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+        if not getattr(self, "_hover_handle", None):
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
 
     def to_dict(self):
         return {

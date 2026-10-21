@@ -91,3 +91,31 @@ def test_view_mouse_tracking_enabled(qtbot):
     view = workspace.view
     assert view.hasMouseTracking() is True
     assert view.viewport().hasMouseTracking() is True
+
+def test_cursor_zones_edge_resize_and_interior_hand(qtbot):
+    from PySide6.QtWidgets import QGraphicsSceneHoverEvent
+    from PySide6.QtCore import QEvent, Qt
+    pixmap = QPixmap(200, 200)
+    item = AnimatedImageItem(pixmap)
+    item.setScale(1.0)
+    
+    def check_cursor(pt):
+        ev = QGraphicsSceneHoverEvent(QEvent.Type.GraphicsSceneHoverMove)
+        ev.setPos(pt)
+        item.hoverMoveEvent(ev)
+        return item.cursor().shape()
+        
+    # Corners: diagonal resize arrows
+    assert check_cursor(QPointF(2, 2)) == Qt.CursorShape.SizeFDiagCursor
+    assert check_cursor(QPointF(198, 198)) == Qt.CursorShape.SizeFDiagCursor
+    assert check_cursor(QPointF(198, 2)) == Qt.CursorShape.SizeBDiagCursor
+    assert check_cursor(QPointF(2, 198)) == Qt.CursorShape.SizeBDiagCursor
+    
+    # Edges: vertical and horizontal resize arrows
+    assert check_cursor(QPointF(100, 2)) == Qt.CursorShape.SizeVerCursor
+    assert check_cursor(QPointF(100, 198)) == Qt.CursorShape.SizeVerCursor
+    assert check_cursor(QPointF(2, 100)) == Qt.CursorShape.SizeHorCursor
+    assert check_cursor(QPointF(198, 100)) == Qt.CursorShape.SizeHorCursor
+    
+    # Interior: grab hand cursor (المقبض)
+    assert check_cursor(QPointF(100, 100)) == Qt.CursorShape.OpenHandCursor
