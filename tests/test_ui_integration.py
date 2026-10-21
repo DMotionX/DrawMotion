@@ -50,3 +50,32 @@ def test_assets_grid_left_alignment(qtbot):
     assert layout.columnMinimumWidth(1) == 102
     assert layout.columnStretch(2) == 1
 
+def test_timeline_resize_handle(qtbot):
+    """Test that timeline resize handle exists, clamps height safely, and resets on double click."""
+    window = WhiteInkMainWindow()
+    qtbot.addWidget(window)
+    
+    timeline = window.bottom_panel
+    assert hasattr(timeline, 'resize_handle')
+    handle = timeline.resize_handle
+    assert handle is not None
+    assert handle.cursor().shape() == Qt.CursorShape.SplitVCursor
+    
+    # Test setting height within and outside boundaries
+    timeline.set_timeline_height(100)
+    assert timeline.height() == 100
+    
+    # Minimum clamp boundary (76px)
+    timeline.set_timeline_height(30)
+    assert timeline.height() == 76
+    
+    # Maximum clamp boundary (capped at 450 max)
+    timeline.set_timeline_height(800)
+    assert timeline.height() <= 450
+    
+    # Double click reset to default height (180px)
+    timeline.set_timeline_height(120)
+    assert timeline.height() == 120
+    qtbot.mouseDClick(handle, Qt.MouseButton.LeftButton)
+    assert timeline.height() == 180
+
