@@ -769,7 +769,7 @@ class AnimatedImageItem(QGraphicsObject):
     def shape(self):
         path = QPainterPath()
         s = self.scale() if self.scale() > 0 else 1.0
-        pad = 14.0 / s
+        pad = 15.0 / s
         path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
         return path
 
@@ -777,22 +777,29 @@ class AnimatedImageItem(QGraphicsObject):
         pos = event.pos()
         br = self.boundingRect()
         s = self.scale() if self.scale() > 0 else 1.0
-        hs = 14.0 / s
+        hs = 12.0 / s
         
         mid_x = (br.left() + br.right()) / 2.0
         mid_y = (br.top() + br.bottom()) / 2.0
         
+        # Hysteresis damping buffer (+3px) prevents micro-flicker on the handle boundaries
+        cur = getattr(self, "_hover_handle", None)
+        buf = 3.0 / s
+        def _rect(cx, cy, name):
+            r = hs + (buf if cur == name else 0.0)
+            return QRectF(cx - r, cy - r, r * 2, r * 2)
+
         # 4 Corner hitboxes
-        tl = QRectF(br.left() - hs, br.top() - hs, hs * 2, hs * 2)
-        tr = QRectF(br.right() - hs, br.top() - hs, hs * 2, hs * 2)
-        bl = QRectF(br.left() - hs, br.bottom() - hs, hs * 2, hs * 2)
-        br_rect = QRectF(br.right() - hs, br.bottom() - hs, hs * 2, hs * 2)
+        tl = _rect(br.left(), br.top(), "TL")
+        tr = _rect(br.right(), br.top(), "TR")
+        bl = _rect(br.left(), br.bottom(), "BL")
+        br_rect = _rect(br.right(), br.bottom(), "BR")
 
         # 4 Edge midpoint hitboxes
-        tc = QRectF(mid_x - hs, br.top() - hs, hs * 2, hs * 2)
-        bc = QRectF(mid_x - hs, br.bottom() - hs, hs * 2, hs * 2)
-        lc = QRectF(br.left() - hs, mid_y - hs, hs * 2, hs * 2)
-        rc = QRectF(br.right() - hs, mid_y - hs, hs * 2, hs * 2)
+        tc = _rect(mid_x, br.top(), "TC")
+        bc = _rect(mid_x, br.bottom(), "BC")
+        lc = _rect(br.left(), mid_y, "LC")
+        rc = _rect(br.right(), mid_y, "RC")
 
         if tl.contains(pos):
             self.setCursor(Qt.CursorShape.SizeFDiagCursor)
@@ -822,6 +829,11 @@ class AnimatedImageItem(QGraphicsObject):
             self.setCursor(Qt.CursorShape.ArrowCursor)
             self._hover_handle = None
         super().hoverMoveEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self._hover_handle = None
+        super().hoverLeaveEvent(event)
 
     def mousePressEvent(self, event):
         handle = getattr(self, "_hover_handle", None)
