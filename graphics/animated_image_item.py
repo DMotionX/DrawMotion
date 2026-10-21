@@ -769,7 +769,7 @@ class AnimatedImageItem(QGraphicsObject):
     def shape(self):
         path = QPainterPath()
         s = self.scale() if self.scale() > 0 else 1.0
-        pad = 24.0 / s
+        pad = 14.0 / s
         path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
         return path
 
@@ -777,7 +777,7 @@ class AnimatedImageItem(QGraphicsObject):
         pos = event.pos()
         br = self.boundingRect()
         s = self.scale() if self.scale() > 0 else 1.0
-        hs = 24.0 / s
+        hs = 14.0 / s
         
         mid_x = (br.left() + br.right()) / 2.0
         mid_y = (br.top() + br.bottom()) / 2.0
@@ -816,18 +816,6 @@ class AnimatedImageItem(QGraphicsObject):
             self.setCursor(Qt.CursorShape.SizeHorCursor)
             self._hover_handle = "LC"
         elif rc.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-            self._hover_handle = "RC"
-        elif abs(pos.y() - br.top()) <= hs/2 and (br.left() <= pos.x() <= br.right()):
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
-            self._hover_handle = "TC"
-        elif abs(pos.y() - br.bottom()) <= hs/2 and (br.left() <= pos.x() <= br.right()):
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
-            self._hover_handle = "BC"
-        elif abs(pos.x() - br.left()) <= hs/2 and (br.top() <= pos.y() <= br.bottom()):
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-            self._hover_handle = "LC"
-        elif abs(pos.x() - br.right()) <= hs/2 and (br.top() <= pos.y() <= br.bottom()):
             self.setCursor(Qt.CursorShape.SizeHorCursor)
             self._hover_handle = "RC"
         else:
