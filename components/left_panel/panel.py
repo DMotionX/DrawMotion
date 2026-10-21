@@ -652,9 +652,18 @@ class LeftPanel(QFrame):
         
         grid_content = QWidget()
         grid_content.setStyleSheet("background: transparent;")
+        grid_content.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.assets_grid_layout = QGridLayout(grid_content)
         self.assets_grid_layout.setContentsMargins(0, 4, 0, 8)
         self.assets_grid_layout.setSpacing(8)
+        self.assets_grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        
+        # Fixed column constraints ensuring items start from the left and never center in empty space
+        self.assets_grid_layout.setColumnMinimumWidth(0, 102)
+        self.assets_grid_layout.setColumnMinimumWidth(1, 102)
+        self.assets_grid_layout.setColumnStretch(0, 0)
+        self.assets_grid_layout.setColumnStretch(1, 0)
+        self.assets_grid_layout.setColumnStretch(2, 1)
         
         self.current_asset_folder = ""
         self.asset_search_query = ""
@@ -794,7 +803,7 @@ class LeftPanel(QFrame):
             empty_lbl = QLabel("No assets found" if search_query else "Folder is empty")
             empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty_lbl.setStyleSheet(f"color: {THEME_COLORS['text_secondary']}; font-size: 11px; padding: 24px;")
-            self.assets_grid_layout.addWidget(empty_lbl, 0, 0, 1, 2)
+            self.assets_grid_layout.addWidget(empty_lbl, 0, 0, 1, 3, Qt.AlignmentFlag.AlignCenter)
             return
             
         for idx, item_data in enumerate(items):
@@ -873,7 +882,7 @@ class LeftPanel(QFrame):
                 folder_card.installEventFilter(self)
                 folder_card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
                 folder_card.customContextMenuRequested.connect(self._on_folder_card_custom_context_menu)
-                self.assets_grid_layout.addWidget(folder_card, row, col)
+                self.assets_grid_layout.addWidget(folder_card, row, col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
             else:
                 filepath = item_data['filepath']
                 filename = os.path.basename(filepath)
@@ -979,7 +988,15 @@ class LeftPanel(QFrame):
                 from core.thumbnail_engine import ThumbnailEngine
                 ThumbnailEngine.get_instance().request_thumbnail(filepath, create_thumbnail_callback(thumb_lbl))
                 
-                self.assets_grid_layout.addWidget(card, row, col)
+                self.assets_grid_layout.addWidget(card, row, col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        # Enforce column dimensions and bottom stretch to anchor cards to the left
+        self.assets_grid_layout.setColumnMinimumWidth(0, 102)
+        self.assets_grid_layout.setColumnMinimumWidth(1, 102)
+        self.assets_grid_layout.setColumnStretch(0, 0)
+        self.assets_grid_layout.setColumnStretch(1, 0)
+        self.assets_grid_layout.setColumnStretch(2, 1)
+        self.assets_grid_layout.setRowStretch(len(items) // 2 + 1, 1)
 
     def _show_folder_context_menu(self, btn, pos, folder_name):
         from PySide6.QtWidgets import QMenu, QInputDialog, QMessageBox

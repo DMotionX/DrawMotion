@@ -36,3 +36,17 @@ def test_export_button_triggers_dialog(qtbot, monkeypatch):
     # Verify the dialog was created and executed
     assert len(dialog_opened) == 1
 
+def test_assets_grid_left_alignment(qtbot):
+    """Test that assets grid starts strictly from the left and aligns to the top-left corner."""
+    window = WhiteInkMainWindow()
+    qtbot.addWidget(window)
+    
+    panel = window.left_panel
+    layout = panel.assets_grid_layout
+    
+    assert bool(layout.alignment() & Qt.AlignmentFlag.AlignLeft)
+    assert bool(layout.alignment() & Qt.AlignmentFlag.AlignTop)
+    assert layout.columnMinimumWidth(0) == 102
+    assert layout.columnMinimumWidth(1) == 102
+    assert layout.columnStretch(2) == 1
+
