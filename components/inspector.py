@@ -18,9 +18,23 @@ def convert_arabic_numerals(text: str) -> str:
 
 class NoScrollComboBox(QComboBox):
     def wheelEvent(self, e):
-        e.ignore()
+        e.accept()
 
 QComboBox = NoScrollComboBox
+
+class InspectorScrollArea(QScrollArea):
+    """
+    Custom QScrollArea that prevents focus transitions from violently hijacking
+    and auto-scrolling the inspector viewport.
+    """
+    def focusNextPrevChild(self, next):
+        return False
+
+    def eventFilter(self, obj, event):
+        from PySide6.QtCore import QEvent
+        if event.type() in (QEvent.Type.FocusIn, QEvent.Type.FocusAboutToChange):
+            return True
+        return super().eventFilter(obj, event)
 
 class InspectorPanel(QFrame):
     item_modified = Signal()
@@ -44,11 +58,22 @@ class InspectorPanel(QFrame):
         self.workspace = workspace
         
     def set_inputs_enabled(self, enabled: bool):
-        # We only disable inputs so the scrollbar remains active
+        # We only disable inputs so the scrollbar remains active, while preserving scroll position
+        active_scrolls = [
+            getattr(self, 'object_scroll_area', None),
+            getattr(self, 'style_scroll_area', None),
+            getattr(self, 'audio_scroll_area', None),
+        ]
+        saved_positions = {s: s.verticalScrollBar().value() for s in active_scrolls if s and hasattr(s, 'verticalScrollBar')}
+
         from PySide6.QtWidgets import QLineEdit, QComboBox, QSlider, QCheckBox
         for widget_type in (QLineEdit, QComboBox, QSlider, QCheckBox):
             for widget in self.findChildren(widget_type):
                 widget.setEnabled(enabled)
+
+        for s, pos in saved_positions.items():
+            if s and hasattr(s, 'verticalScrollBar'):
+                s.verticalScrollBar().setValue(pos)
 
 
     def _create_section_label(self, text):
@@ -120,9 +145,8 @@ class InspectorPanel(QFrame):
         # When user tweaks audio settings, notify the item
         self.audio_fx_panel.settings_changed.connect(self._on_audio_settings_changed)
         
-        # [PHASE 7 FIX] Wrap the panel in a QScrollArea to prevent layout collapse
-        from PySide6.QtWidgets import QScrollArea
-        self.audio_scroll_area = QScrollArea()
+        # [PHASE 7 FIX] Wrap the panel in an InspectorScrollArea to prevent layout collapse
+        self.audio_scroll_area = InspectorScrollArea()
         self.audio_scroll_area.setWidgetResizable(True)
         self.audio_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.audio_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -188,7 +212,7 @@ class InspectorPanel(QFrame):
         obj_layout.setContentsMargins(0, 0, 0, 0)
         obj_layout.setSpacing(0)
         
-        self.object_scroll_area = QScrollArea()
+        self.object_scroll_area = InspectorScrollArea()
         self.object_scroll_area.setWidgetResizable(True)
         self.object_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.object_scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -323,7 +347,7 @@ class InspectorPanel(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        self.style_scroll_area = QScrollArea()
+        self.style_scroll_area = InspectorScrollArea()
         self.style_scroll_area.setWidgetResizable(True)
         self.style_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.style_scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -687,6 +711,7 @@ class InspectorPanel(QFrame):
             
     def _apply_drawing_style(self, text):
         if not self.current_item or not hasattr(self.current_item, 'set_drawing_style'): return
+        cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
         self.current_item.set_drawing_style(text)
         
         if hasattr(self, 'library_style_cb'):
@@ -695,9 +720,12 @@ class InspectorPanel(QFrame):
             self.library_style_cb.blockSignals(False)
             
         self.item_modified.emit()
+        if hasattr(self, 'style_scroll_area') and self.style_scroll_area:
+            self.style_scroll_area.verticalScrollBar().setValue(cur_scroll)
 
     def _apply_drawing_direction(self, text):
         if not self.current_item or not hasattr(self.current_item, 'set_drawing_direction'): return
+        cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
         val_map = {
             "Auto Detect": "auto",
             "Right to Left (Arabic)": "rtl",
@@ -705,10 +733,13 @@ class InspectorPanel(QFrame):
         }
         self.current_item.set_drawing_direction(val_map.get(text, "auto"))
         self.item_modified.emit()
+        if hasattr(self, 'style_scroll_area') and self.style_scroll_area:
+            self.style_scroll_area.verticalScrollBar().setValue(cur_scroll)
 
     def _apply_library_style(self, text):
         if text == "Select Library Style...": return
         if not self.current_item or not hasattr(self.current_item, 'set_drawing_style'): return
+        cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
         self.current_item.set_drawing_style(text)
         
         if hasattr(self, 'drawing_style_cb'):
@@ -717,6 +748,8 @@ class InspectorPanel(QFrame):
             self.drawing_style_cb.blockSignals(False)
             
         self.item_modified.emit()
+        if hasattr(self, 'style_scroll_area') and self.style_scroll_area:
+            self.style_scroll_area.verticalScrollBar().setValue(cur_scroll)
 
     def _apply_algorithm_style(self, text):
         if not self.current_item or not hasattr(self.current_item, 'model'): return
