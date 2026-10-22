@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QScrollArea
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QTimer
 
 from .components.sidebar import SettingsSidebar
 from .components.project_settings import ProjectSettings
@@ -93,11 +93,11 @@ class SettingsPage(QWidget):
         # Scroll area wrapping all section content
         self.stacked_content = QStackedWidget()
         
-        scroll = QScrollArea()
-        scroll.setWidget(self.stacked_content)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll.setStyleSheet("""
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidget(self.stacked_content)
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.content_scroll.setStyleSheet("""
             QScrollArea { background: transparent; border: none; }
             QScrollBar:vertical {
                 background: #0E1512;
@@ -127,11 +127,11 @@ class SettingsPage(QWidget):
         
         self.stacked_content.addWidget(UpdateSettings())
         
-        # Connect sidebar
-        self.sidebar.section_selected.connect(self.stacked_content.setCurrentIndex)
+        # Connect sidebar with auto-scroll reset to top
+        self.sidebar.section_selected.connect(self._on_section_selected)
         
         body_layout.addWidget(self.sidebar)
-        body_layout.addWidget(scroll, 1)  # Content takes all remaining space
+        body_layout.addWidget(self.content_scroll, 1)  # Content takes all remaining space
         
         main_layout.addWidget(header)
         main_layout.addWidget(body, 1)
@@ -139,9 +139,53 @@ class SettingsPage(QWidget):
     def set_project_manager(self, pm):
         self.storage_settings.set_project_manager(pm)
 
+    def _on_section_selected(self, index: int):
+        self.stacked_content.setCurrentIndex(index)
+        if hasattr(self, 'content_scroll') and self.content_scroll:
+            self.content_scroll.verticalScrollBar().setValue(0)
+            QTimer.singleShot(0, lambda: self.content_scroll.verticalScrollBar().setValue(0))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, 'content_scroll') and self.content_scroll:
+            self.content_scroll.verticalScrollBar().setValue(0)
+            QTimer.singleShot(0, lambda: self.content_scroll.verticalScrollBar().setValue(0))
+
     def _on_save_clicked(self):
         from core.settings_manager import SettingsManager
         SettingsManager().save()
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Settings Saved", "Your settings have been saved successfully.")
-        self.back_requested.emit()
+        
+        # Elegant non-blocking button confirmation feedback
+        self.save_btn.setText("✓ Settings Saved!")
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                padding: 9px 26px;
+                border-radius: 6px;
+                font-weight: 700;
+                font-size: 13px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+        """)
+        
+        def _restore_save_button():
+            if hasattr(self, 'save_btn') and self.save_btn:
+                self.save_btn.setText("Save Settings")
+                self.save_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #2E8B57;
+                        color: white;
+                        border: none;
+                        padding: 9px 26px;
+                        border-radius: 6px;
+                        font-weight: 700;
+                        font-size: 13px;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                    }
+                    QPushButton:hover { background-color: #38A169; }
+                    QPushButton:pressed { background-color: #276749; }
+                """)
+                
+        QTimer.singleShot(2000, _restore_save_button)

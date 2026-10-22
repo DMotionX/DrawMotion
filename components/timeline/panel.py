@@ -66,6 +66,88 @@ class PlayheadWidget(QWidget):
         self.time_seek.emit(time_sec)
 
 # ─────────────────────────────────────────────────────────────────────────────
+class TimelineResizeHandle(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("TimelineResizeHandle")
+        self.setFixedHeight(8)
+        self.setCursor(Qt.CursorShape.SplitVCursor)
+        self.setToolTip("Drag vertically to resize timeline | Double-click to reset")
+        self._is_dragging = False
+        self._drag_start_y = 0
+        self._drag_start_height = 0
+        self.setStyleSheet(f"""
+            #TimelineResizeHandle {{
+                background-color: {THEME_COLORS['bg_main']};
+                border-top: 1px solid {THEME_COLORS['divider']};
+            }}
+        """)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        pill_w = 40
+        pill_h = 4
+        pill_x = int((self.width() - pill_w) / 2)
+        pill_y = int((self.height() - pill_h) / 2)
+        
+        is_active = self.underMouse() or self._is_dragging
+        color = QColor(THEME_COLORS['primary_green']) if is_active else QColor(255, 255, 255, 60)
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 2, 2)
+
+    def enterEvent(self, event):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_dragging = True
+            self._drag_start_y = event.globalPosition().y()
+            parent = self.parentWidget()
+            if parent:
+                self._drag_start_height = parent.height()
+            self.update()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_dragging:
+            delta_y = event.globalPosition().y() - self._drag_start_y
+            parent = self.parentWidget()
+            if parent and hasattr(parent, 'set_timeline_height'):
+                new_h = int(self._drag_start_height - delta_y)
+                parent.set_timeline_height(new_h)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._is_dragging:
+            self._is_dragging = False
+            self.update()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            parent = self.parentWidget()
+            if parent and hasattr(parent, 'set_timeline_height'):
+                parent.set_timeline_height(180)
+            event.accept()
+        else:
+            super().mouseDoubleClickEvent(event)
+
+# ─────────────────────────────────────────────────────────────────────────────
 class TimelinePanel(QFrame):
     delete_item_requested = Signal(object)
     time_seek = Signal(float)
@@ -73,10 +155,20 @@ class TimelinePanel(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("BottomPanel")
-        self.setMinimumHeight(120)
+        self._custom_height = 180
+        self.setFixedHeight(180)
         self.workspace     = None
         self._layer_rows   = []   # list of BaseLayerRow instances
         self._init_ui()
+
+    def set_timeline_height(self, h: int):
+        min_h = 76
+        window = self.window()
+        max_h = int(window.height() * 0.45) if window else 350
+        max_h = max(250, min(max_h, 450))
+        clamped_h = max(min_h, min(max_h, h))
+        self.setFixedHeight(clamped_h)
+        self._custom_height = clamped_h
 
     # ─────────────────────────────────────────────────────────────
     # UI build
@@ -86,7 +178,11 @@ class TimelinePanel(QFrame):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
         
-        # New Timeline Toolbar at the top
+        # 1. Resizable split handle at the very top of the timeline
+        self.resize_handle = TimelineResizeHandle(self)
+        root.addWidget(self.resize_handle)
+
+        # 2. Timeline Toolbar
         from components.timeline.toolbar import TimelineToolbar
         self.toolbar = TimelineToolbar(self)
         
@@ -186,7 +282,29 @@ class TimelinePanel(QFrame):
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._scroll.setStyleSheet("border: none; background: transparent;")
+        self._scroll.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background: transparent;
+            }}
+            QScrollBar:vertical {{
+                border: none;
+                background: transparent;
+                width: 6px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(255, 255, 255, 0.2);
+                min-height: 20px;
+                border-radius: 3px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: rgba(255, 255, 255, 0.4);
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+        """)
 
         self._tracks_container = QWidget()
         self._tracks_container.setStyleSheet("background: transparent;")
@@ -213,14 +331,14 @@ class TimelinePanel(QFrame):
 
     def _on_focus_mode_toggled(self, is_focused):
         """Collapses the entire track area, leaving only the toolbar visible."""
+        handle_h = self.resize_handle.height() if hasattr(self, 'resize_handle') else 0
         if is_focused:
             self.content_widget.hide()
-            self.setMinimumHeight(36)  # Just the height of the toolbar
-            self.setMaximumHeight(36)
+            self.setFixedHeight(36 + handle_h)
         else:
             self.content_widget.show()
-            self.setMaximumHeight(16777215) # Remove maximum height constraint
-            self.setMinimumHeight(120)      # Restore normal minimum height
+            restored_h = getattr(self, '_custom_height', 180)
+            self.setFixedHeight(restored_h)
 
     # ─────────────────────────────────────────────────────────────
     # Public API

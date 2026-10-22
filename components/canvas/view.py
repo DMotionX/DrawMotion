@@ -7,6 +7,11 @@ class CustomGraphicsView(QGraphicsView):
         self.workspace = workspace
         self.setAcceptDrops(True)
         
+        # Enable real-time mouse tracking so hover events on handles and canvas fire instantly at 60 FPS
+        self.setMouseTracking(True)
+        if self.viewport():
+            self.viewport().setMouseTracking(True)
+            
         # Enable high-quality rendering to prevent pixelation on small screens
         from PySide6.QtGui import QPainter
         self.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)

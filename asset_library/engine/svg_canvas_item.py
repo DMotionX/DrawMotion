@@ -1,7 +1,8 @@
+import math
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
 from PySide6.QtCore import Qt, QRectF, QPointF, Property, Signal, QThread
-from PySide6.QtGui import QPainter, QPen, QColor, QImage, QPixmap
+from PySide6.QtGui import QPainter, QPen, QColor, QImage, QPixmap, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 
 # We reuse the stable Solid Reveal worker from the image engine to satisfy the 'Zero Risk' policy
@@ -435,20 +436,27 @@ class SVGCanvasItem(QGraphicsSvgItem):
         br = self.boundingRect()
         painter.drawRect(br)
 
-        painter.setBrush(QColor(255, 255, 255))
-        h_pen = QPen(QColor(33, 150, 243))
+        painter.setBrush(QColor("#FFFFFF"))
+        h_pen = QPen(QColor("#2196F3"))
         h_pen.setWidth(1)
         h_pen.setCosmetic(True)
         painter.setPen(h_pen)
         
         hs = 8 / self.scale() if self.scale() != 0 else 8
-        for rx, ry in [
-            (br.left(), br.top()), 
-            (br.right()-hs, br.top()),
-            (br.left(), br.bottom()-hs), 
-            (br.right()-hs, br.bottom()-hs)
-        ]:
-            painter.drawRect(QRectF(rx, ry, hs, hs))
+        mid_x = (br.left() + br.right()) / 2.0
+        mid_y = (br.top() + br.bottom()) / 2.0
+        handles = [
+            (br.left(), br.top()),       # TL
+            (mid_x, br.top()),           # TC
+            (br.right(), br.top()),      # TR
+            (br.right(), mid_y),         # RC
+            (br.right(), br.bottom()),   # BR
+            (mid_x, br.bottom()),        # BC
+            (br.left(), br.bottom()),    # BL
+            (br.left(), mid_y)           # LC
+        ]
+        for cx, cy in handles:
+            painter.drawRect(QRectF(cx - hs/2, cy - hs/2, hs, hs))
             
         painter.restore()
 
@@ -492,51 +500,154 @@ class SVGCanvasItem(QGraphicsSvgItem):
 
     # ── Interactive Resizing ──────────────────────────────────────────────────
 
+    def shape(self):
+        path = QPainterPath()
+        s = self.scale() if self.scale() > 0 else 1.0
+        pad = 14.0 / s
+        path.addRect(self.boundingRect().adjusted(-pad, -pad, pad, pad))
+        return path
+
     def hoverMoveEvent(self, event):
         pos = event.pos()
         br = self.boundingRect()
-        hs = 12 / self.scale() if self.scale() != 0 else 12
+        s = self.scale() if self.scale() > 0 else 1.0
         
-        tl = QRectF(br.left()-hs, br.top()-hs, hs*2, hs*2)
-        tr = QRectF(br.right()-hs, br.top()-hs, hs*2, hs*2)
-        bl = QRectF(br.left()-hs, br.bottom()-hs, hs*2, hs*2)
-        br_rect = QRectF(br.right()-hs, br.bottom()-hs, hs*2, hs*2)
+        # Responsive edge and corner margins
+        edge_margin = 12.0 / s
+        corner_reach = 24.0 / s
+        
+        min_dim = min(br.width(), br.height())
+        if min_dim > 0:
+            edge_margin = min(edge_margin, min_dim * 0.35)
+            corner_reach = min(corner_reach, min_dim * 0.45)
+            
+        x, y = pos.x(), pos.y()
+        left, top, right, bottom = br.left(), br.top(), br.right(), br.bottom()
+        
+        # Check boundary proximity (Resize Zone)
+        near_left = abs(x - left) <= edge_margin
+        near_right = abs(x - right) <= edge_margin
+        near_top = abs(y - top) <= edge_margin
+        near_bottom = abs(y - bottom) <= edge_margin
+        
+        outside_left = (x < left)
+        outside_right = (x > right)
+        outside_top = (y < top)
+        outside_bottom = (y > bottom)
+        
+        is_on_edge = (near_left or near_right or near_top or near_bottom or
+                      outside_left or outside_right or outside_top or outside_bottom)
 
-        if tl.contains(pos) or br_rect.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-            self._resize_dir = "FDiag"
-        elif tr.contains(pos) or bl.contains(pos):
-            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-            self._resize_dir = "BDiag"
+        if is_on_edge:
+            # 1. Corners (TL, TR, BL, BR) take top priority
+            is_top_corner = (y <= top + corner_reach)
+            is_bottom_corner = (y >= bottom - corner_reach)
+            is_left_corner = (x <= left + corner_reach)
+            is_right_corner = (x >= right - corner_reach)
+
+            if (is_left_corner and is_top_corner) or (near_left and is_top_corner) or (near_top and is_left_corner):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                self._hover_handle = "TL"
+            elif (is_right_corner and is_bottom_corner) or (near_right and is_bottom_corner) or (near_bottom and is_right_corner):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                self._hover_handle = "BR"
+            elif (is_right_corner and is_top_corner) or (near_right and is_top_corner) or (near_top and is_right_corner):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                self._hover_handle = "TR"
+            elif (is_left_corner and is_bottom_corner) or (near_left and is_bottom_corner) or (near_bottom and is_left_corner):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                self._hover_handle = "BL"
+            # 2. Side edges (Top, Bottom, Left, Right)
+            elif near_top or (outside_top and left <= x <= right):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+                self._hover_handle = "TC"
+            elif near_bottom or (outside_bottom and left <= x <= right):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+                self._hover_handle = "BC"
+            elif near_left or (outside_left and top <= y <= bottom):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+                self._hover_handle = "LC"
+            elif near_right or (outside_right and top <= y <= bottom):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+                self._hover_handle = "RC"
+            else:
+                self.setCursor(Qt.CursorShape.OpenHandCursor)
+                self._hover_handle = None
         else:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            self._resize_dir = None
+            # Deep inside image -> Move/Grab zone ("المقبض")
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+            self._hover_handle = None
+
         super().hoverMoveEvent(event)
 
+    def hoverLeaveEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self._hover_handle = None
+        super().hoverLeaveEvent(event)
+
     def mousePressEvent(self, event):
-        if getattr(self, "_resize_dir", None):
+        handle = getattr(self, "_hover_handle", None)
+        if handle and event.button() == Qt.MouseButton.LeftButton:
             self._is_resizing = True
+            self._active_handle = handle
             self._resize_start_pos = event.scenePos()
             self._resize_start_scale = self.scale()
+            
+            br = self.boundingRect()
+            mid_x = (br.left() + br.right()) / 2.0
+            mid_y = (br.top() + br.bottom()) / 2.0
+            
+            if handle == "TL":
+                anchor_item = br.bottomRight()
+            elif handle == "TR":
+                anchor_item = br.bottomLeft()
+            elif handle == "BL":
+                anchor_item = br.topRight()
+            elif handle == "BR":
+                anchor_item = br.topLeft()
+            elif handle == "TC":
+                anchor_item = QPointF(mid_x, br.bottom())
+            elif handle == "BC":
+                anchor_item = QPointF(mid_x, br.top())
+            elif handle == "LC":
+                anchor_item = QPointF(br.right(), mid_y)
+            else: # "RC"
+                anchor_item = QPointF(br.left(), mid_y)
+                
+            self._resize_anchor_item = anchor_item
+            self._resize_anchor_scene = self.mapToScene(anchor_item)
+            
+            initial_vec = self._resize_start_pos - self._resize_anchor_scene
+            self._resize_initial_dist = max(10.0, math.hypot(initial_vec.x(), initial_vec.y()))
+            self._resize_initial_vec = initial_vec
             event.accept()
         else:
+            self._is_resizing = False
+            self._active_handle = None
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if getattr(self, "_is_resizing", False):
-            dy = event.scenePos().y() - self._resize_start_pos.y()
-            dx = event.scenePos().x() - self._resize_start_pos.x()
+        if getattr(self, "_is_resizing", False) and getattr(self, "_active_handle", None):
+            anchor_scene = self._resize_anchor_scene
+            cur_vec = event.scenePos() - anchor_scene
+            cur_dist = math.hypot(cur_vec.x(), cur_vec.y())
             
-            dist = (dy + dx) / 2.0
-            scale_change = dist / max(10.0, self.boundingRect().height())
+            init_vec = self._resize_initial_vec
+            dot = (cur_vec.x() * init_vec.x() + cur_vec.y() * init_vec.y())
             
-            if self._resize_start_pos.y() < self.scenePos().y():
-                scale_change = -scale_change
+            if dot <= 0:
+                scale_factor = 0.05 / max(0.01, self._resize_start_scale)
+            else:
+                scale_factor = cur_dist / max(10.0, self._resize_initial_dist)
                 
-            new_scale = max(0.05, self._resize_start_scale + scale_change)
-            
-            self.setTransformOriginPoint(self.boundingRect().center())
+            new_scale = max(0.05, min(15.0, self._resize_start_scale * scale_factor))
             self.setScale(new_scale)
+            
+            new_anchor_scene = self.mapToScene(self._resize_anchor_item)
+            shift = new_anchor_scene - anchor_scene
+            self.setPos(self.pos() - shift)
             
             self.update()
             event.accept()
@@ -546,9 +657,18 @@ class SVGCanvasItem(QGraphicsSvgItem):
     def mouseReleaseEvent(self, event):
         if getattr(self, "_is_resizing", False):
             self._is_resizing = False
+            self._active_handle = None
+            if self.scene() and hasattr(self.scene(), 'parent'):
+                parent_ws = self.scene().parent()
+                if hasattr(parent_ws, 'item_selected'):
+                    parent_ws.item_selected.emit(self)
+                if hasattr(parent_ws, 'items_changed'):
+                    parent_ws.items_changed.emit(parent_ws.user_items)
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+        if not getattr(self, "_hover_handle", None):
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
 
     def to_dict(self):
         return {
