@@ -94,6 +94,7 @@ class InspectorPanel(QFrame):
         tabs.addTab(self.audio_tab, "Audio FX")
         
         self.tabs = tabs
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         prop_layout.addWidget(tabs)
         self.stack.addWidget(self.properties_page)
         
@@ -121,18 +122,32 @@ class InspectorPanel(QFrame):
         
         # [PHASE 7 FIX] Wrap the panel in a QScrollArea to prevent layout collapse
         from PySide6.QtWidgets import QScrollArea
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
+        self.audio_scroll_area = QScrollArea()
+        self.audio_scroll_area.setWidgetResizable(True)
+        self.audio_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.audio_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.audio_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.audio_scroll_area.setStyleSheet("""
             QScrollArea { border: none; background: transparent; }
             QWidget#scrollAreaWidgetContents { background: transparent; }
         """)
-        scroll.setWidget(self.audio_fx_panel)
+        self.audio_scroll_area.setWidget(self.audio_fx_panel)
         
-        layout.addWidget(scroll)
+        layout.addWidget(self.audio_scroll_area)
         return tab
+
+    def _on_tab_changed(self, index: int):
+        self._ensure_active_tab_scrolled_to_top()
+        QTimer.singleShot(0, self._ensure_active_tab_scrolled_to_top)
+
+    def _ensure_active_tab_scrolled_to_top(self):
+        for scroll in [
+            getattr(self, 'object_scroll_area', None),
+            getattr(self, 'style_scroll_area', None),
+            getattr(self, 'audio_scroll_area', None),
+        ]:
+            if scroll and hasattr(scroll, 'verticalScrollBar'):
+                scroll.verticalScrollBar().setValue(0)
 
     def _on_audio_settings_changed(self, settings):
         if not self.current_item:
@@ -173,9 +188,10 @@ class InspectorPanel(QFrame):
         obj_layout.setContentsMargins(0, 0, 0, 0)
         obj_layout.setSpacing(0)
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.object_scroll_area = QScrollArea()
+        self.object_scroll_area.setWidgetResizable(True)
+        self.object_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.object_scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
@@ -296,8 +312,8 @@ class InspectorPanel(QFrame):
         scroll_layout.addWidget(self.sync_audio_btn)
         
         scroll_layout.addStretch(1)
-        scroll_area.setWidget(scroll_content)
-        obj_layout.addWidget(scroll_area)
+        self.object_scroll_area.setWidget(scroll_content)
+        obj_layout.addWidget(self.object_scroll_area)
         
         return object_tab
 
@@ -307,9 +323,10 @@ class InspectorPanel(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.style_scroll_area = QScrollArea()
+        self.style_scroll_area.setWidgetResizable(True)
+        self.style_scroll_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.style_scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
@@ -435,8 +452,8 @@ class InspectorPanel(QFrame):
         
         scroll_layout.addStretch(1)
         
-        scroll_area.setWidget(scroll_content)
-        layout.addWidget(scroll_area)
+        self.style_scroll_area.setWidget(scroll_content)
+        layout.addWidget(self.style_scroll_area)
         return tab
 
     def on_item_selected(self, item):
@@ -469,15 +486,21 @@ class InspectorPanel(QFrame):
             self.tabs.setCurrentIndex(3)
             if hasattr(self, 'audio_fx_panel'):
                 self.audio_fx_panel.set_node(item)
+            self._ensure_active_tab_scrolled_to_top()
+            QTimer.singleShot(0, self._ensure_active_tab_scrolled_to_top)
             return
         
         if is_text_item:
             # Show Text and Style tabs
+            current_tab = self.tabs.currentIndex()
             self.tabs.setTabVisible(0, True)
             self.tabs.setTabVisible(1, False)
             self.tabs.setTabVisible(2, True)
             self.tabs.setTabVisible(3, False)
-            self.tabs.setCurrentIndex(0)
+            if current_tab in (0, 2):
+                self.tabs.setCurrentIndex(current_tab)
+            else:
+                self.tabs.setCurrentIndex(0)
             if hasattr(self, 'text_editor'):
                 self.text_editor.set_node(item)
                 
@@ -489,11 +512,15 @@ class InspectorPanel(QFrame):
             
         else:
             # Show ONLY Image tabs
+            current_tab = self.tabs.currentIndex()
             self.tabs.setTabVisible(0, False)
             self.tabs.setTabVisible(1, True)
             self.tabs.setTabVisible(2, True)
             self.tabs.setTabVisible(3, False)
-            self.tabs.setCurrentIndex(1)
+            if current_tab in (1, 2):
+                self.tabs.setCurrentIndex(current_tab)
+            else:
+                self.tabs.setCurrentIndex(1)
             
             # Smart Inspector Visibility (Zero-Risk)
             self.drawing_engine_container.show()
@@ -653,6 +680,9 @@ class InspectorPanel(QFrame):
         self.sfx_combo.blockSignals(False)
         if hasattr(self, 'effect_combo'):
             self.effect_combo.blockSignals(False)
+            
+        self._ensure_active_tab_scrolled_to_top()
+        QTimer.singleShot(0, self._ensure_active_tab_scrolled_to_top)
             
             
     def _apply_drawing_style(self, text):

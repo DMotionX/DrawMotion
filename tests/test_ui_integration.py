@@ -79,3 +79,47 @@ def test_timeline_resize_handle(qtbot):
     qtbot.mouseDClick(handle, Qt.MouseButton.LeftButton)
     assert timeline.height() == 180
 
+def test_settings_page_save_and_scroll_reset(qtbot):
+    """Test that settings page does NOT exit on save and resets scrollbar on section switch."""
+    from components.settings.settings_page import SettingsPage
+    page = SettingsPage()
+    qtbot.addWidget(page)
+    page.show()
+    
+    # 1. Test Save does NOT emit back_requested
+    back_signal_fired = False
+    def on_back():
+        nonlocal back_signal_fired
+        back_signal_fired = True
+    page.back_requested.connect(on_back)
+    
+    qtbot.mouseClick(page.save_btn, Qt.MouseButton.LeftButton)
+    assert back_signal_fired is False
+    assert "Saved" in page.save_btn.text()
+    
+    # 2. Test Section Switch resets scroll position to 0
+    page.content_scroll.verticalScrollBar().setValue(150)
+    assert page.content_scroll.verticalScrollBar().value() == 150
+    page._on_section_selected(1)
+    assert page.content_scroll.verticalScrollBar().value() == 0
+
+def test_inspector_scroll_reset_and_tab_retention(qtbot):
+    """Test that inspector panel stores persistent scroll areas and resets scroll on tab change."""
+    from components.inspector import InspectorPanel
+    panel = InspectorPanel()
+    qtbot.addWidget(panel)
+    panel.show()
+    
+    assert hasattr(panel, 'object_scroll_area')
+    assert hasattr(panel, 'style_scroll_area')
+    assert hasattr(panel, 'audio_scroll_area')
+    
+    # Switch stack to properties page and set range to test scroll reset
+    panel.stack.setCurrentWidget(panel.properties_page)
+    panel.object_scroll_area.verticalScrollBar().setRange(0, 500)
+    panel.object_scroll_area.verticalScrollBar().setValue(80)
+    assert panel.object_scroll_area.verticalScrollBar().value() == 80
+    panel._on_tab_changed(1)
+    assert panel.object_scroll_area.verticalScrollBar().value() == 0
+
+
