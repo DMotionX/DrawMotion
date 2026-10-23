@@ -61,6 +61,13 @@ class SVGCanvasItem(QGraphicsSvgItem):
         self._layer_name = "SVG Shape"
         self.drawing_style = "Solid Reveal"
         self.anim_type = "Draw"
+        self.entrance_mode = "draw" # "draw" or "motion"
+        self.motion_settings = {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth"
+        }
         
         self._qimage = None
         self._scribble_buffer = None
@@ -669,6 +676,11 @@ class SVGCanvasItem(QGraphicsSvgItem):
             super().mouseReleaseEvent(event)
         if not getattr(self, "_hover_handle", None):
             self.setCursor(Qt.CursorShape.OpenHandCursor)
+        # Capture live transform for motion graphics so enlarged scale / pos is preserved
+        self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+        self._motion_target_scale = float(self.scale())
+        self._motion_target_rotation = float(self.rotation())
+        self._motion_target_opacity = float(self.opacity())
 
     def to_dict(self):
         return {
@@ -685,6 +697,13 @@ class SVGCanvasItem(QGraphicsSvgItem):
             "anim_type": self.anim_type,
             "sfx_name": getattr(self, "sfx_name", "None"),
             "sfx_volume": getattr(self, "sfx_volume", 100),
+            "entrance_mode": getattr(self, "entrance_mode", "draw"),
+            "motion_settings": getattr(self, "motion_settings", {
+                "style": "hand_drag",
+                "direction": "left",
+                "duration": 1.5,
+                "easing": "smooth"
+            }),
             "svg_filepath": self.property("svg_filepath")
         }
 
@@ -702,8 +721,19 @@ class SVGCanvasItem(QGraphicsSvgItem):
         item._layer_name = data.get("layer_name", "SVG Shape")
         item.drawing_style = data.get("drawing_style", "Solid Reveal")
         item.anim_type = data.get("anim_type", "Draw")
+        item.entrance_mode = data.get("entrance_mode", "draw")
+        item.motion_settings = data.get("motion_settings", {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth"
+        })
         item.sfx_name = data.get("sfx_name", "None")
         item.sfx_volume = data.get("sfx_volume", 100)
+        item._motion_target_pos = QPointF(item.pos().x(), item.pos().y())
+        item._motion_target_scale = float(item.scale())
+        item._motion_target_rotation = float(item.rotation())
+        item._motion_target_opacity = float(item.opacity())
         
         return item
 

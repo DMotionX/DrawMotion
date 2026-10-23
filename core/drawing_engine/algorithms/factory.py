@@ -13,6 +13,11 @@ from .library_assets.smart_blueprint import SmartBlueprintAlgorithm
 from .library_assets.icon_sketch import IconSketchAlgorithm
 from .library_assets.fast_contour import FastContourAlgorithm
 
+# Phase 3: Independent New Drawing Algorithms
+from .blueprint.algorithm import BlueprintDraftingAlgorithm
+from .engraving.algorithm import EngravingHatchAlgorithm
+from .ribbon_flow.algorithm import RibbonFlowAlgorithm
+
 class AlgorithmFactory:
     @staticmethod
     def get_algorithm(style_name: str) -> BaseDrawingAlgorithm:
@@ -25,6 +30,9 @@ class AlgorithmFactory:
             "Organic Sketch": OrganicSketchAlgorithm,
             "Hatch Shading": TopographicShadingAlgorithm,
             "Line Art (Skeleton)": LineArtAlgorithm,
+            "Blueprint Drafting": BlueprintDraftingAlgorithm,
+            "Engraving Hatch": EngravingHatchAlgorithm,
+            "Ribbon Flow": RibbonFlowAlgorithm,
             "Smart Blueprint (Library)": SmartBlueprintAlgorithm,
             "Icon Sketch (Library)": IconSketchAlgorithm,
             "Fast Contour (Library)": FastContourAlgorithm

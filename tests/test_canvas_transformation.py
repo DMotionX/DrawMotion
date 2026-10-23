@@ -1,7 +1,7 @@
 import math
 import pytest
-from PySide6.QtCore import QPointF
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QPointF
+from PySide6.QtGui import QPixmap, QColor
 from PySide6.QtWidgets import QGraphicsScene
 
 from graphics.animated_image_item import AnimatedImageItem
@@ -119,3 +119,67 @@ def test_cursor_zones_edge_resize_and_interior_hand(qtbot):
     
     # Interior: grab hand cursor (المقبض)
     assert check_cursor(QPointF(100, 100)) == Qt.CursorShape.OpenHandCursor
+
+
+def test_replace_image_cache_purge_and_transformation_preservation(qtbot):
+    """Verify that replacing an image purges stale drawing plans while preserving all user transformations."""
+    pix_a = QPixmap(100, 100)
+    pix_a.fill(Qt.GlobalColor.black)
+    item = AnimatedImageItem(pix_a)
+    
+    # User applies custom canvas transformations and animation properties
+    item.setPos(50, 75)
+    item.setRotation(15.0)
+    item.setScale(1.5)
+    item.setOpacity(0.8)
+    item.set_anim_duration(6.0)
+    item.drawing_style = "Solid Reveal"
+    
+    # Simulate a cached plan from the previous image
+    item._plan_cache[("Solid Reveal", "auto", 6.0)] = [{"type": "stroke", "points": [QPointF(0, 0), QPointF(10, 10)]}]
+    item._total_length = 500.0
+    item._cached_pixmap_id = id(pix_a)
+    
+    # Replace with image B (different dimensions)
+    pix_b = QPixmap(250, 300)
+    pix_b.fill(Qt.GlobalColor.blue)
+    ok = item.replace_image(pix_b)
+    
+    assert ok is True
+    # 1. Transformations strictly preserved
+    assert item.pos() == QPointF(50, 75)
+    assert item.rotation() == 15.0
+    assert item.scale() == 1.5
+    assert item.opacity() == 0.8
+    assert item._anim_duration == 6.0
+    assert item.drawing_style == "Solid Reveal"
+    
+    # 2. Dimensions and buffers updated to image B
+    assert item._pixmap.width() == 250
+    assert item._pixmap.height() == 300
+    assert item._scribble_buffer.size() == pix_b.size()
+    assert item._composite_buffer.size() == pix_b.size()
+    
+    # 3. Cache completely purged - NO stale lines from image A
+    assert len(item._plan_cache) == 0
+    assert not hasattr(item, '_total_length')
+
+
+def test_replace_image_rejects_null_or_corrupted_pixmap(qtbot):
+    """Verify that replace_image rejects null/invalid pixmaps with zero side-effects on current image."""
+    pix_a = QPixmap(80, 80)
+    pix_a.fill(Qt.GlobalColor.red)
+    item = AnimatedImageItem(pix_a)
+    
+    # Attempt to replace with null/invalid pixmap
+    null_pix = QPixmap()
+    assert null_pix.isNull() is True
+    
+    ok = item.replace_image(null_pix)
+    assert ok is False
+    
+    # Current image is completely unharmed
+    assert item._pixmap.width() == 80
+    assert item._pixmap.height() == 80
+    assert not item._pixmap.isNull()
+

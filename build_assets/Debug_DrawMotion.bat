@@ -40,4 +40,10 @@ echo %%LOCALAPPDATA%%\DrawMotion\Logs\startup_lifecycle.log
 echo %%LOCALAPPDATA%%\DrawMotion\Logs\qt_messages.log
 echo %%LOCALAPPDATA%%\DrawMotion\Logs\crash_faulthandler.log
 echo ========================================================
+if exist "%LOCALAPPDATA%\DrawMotion\Logs\startup_lifecycle.log" (
+    echo.
+    echo --- Last Startup Lifecycle Events ---
+    powershell -NoProfile -Command "Get-Content '%LOCALAPPDATA%\DrawMotion\Logs\startup_lifecycle.log' -Tail 15"
+    echo.
+)
 pause

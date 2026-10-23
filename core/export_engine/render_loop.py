@@ -177,6 +177,8 @@ class RenderLoop(QObject):
                 painter = QPainter(current_image)
                 painter.setRenderHint(QPainter.RenderHint.Antialiasing)
                 painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                if hasattr(QPainter.RenderHint, 'LosslessImageRendering'):
+                    painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
                 
                 self.scene.render(
                     painter,

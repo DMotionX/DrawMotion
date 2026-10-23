@@ -22,14 +22,22 @@ class PlannerWorker(QObject):
         self.inv_scale  = inv_scale
         self.rtl        = rtl
         self.is_text    = is_text
+        self.is_cancelled = False
+
+    def cancel(self):
+        self.is_cancelled = True
 
     def run(self):
         try:
+            if self.is_cancelled:
+                return
             from core.drawing_engine.algorithms.factory import AlgorithmFactory
             algorithm = AlgorithmFactory.get_algorithm(self.style_name)
             
             # Pass effective RTL direction to algorithm
             timed_segments = algorithm.generate_plan(self.qimage, self.duration, rtl=self.rtl)
+            if self.is_cancelled:
+                return
 
             import math
 
@@ -46,7 +54,8 @@ class PlannerWorker(QObject):
                 # Modern vector algorithms (Professional, Sketch, Educational, etc.) already manage intentional strokes
                 # and explicit in-air travel flights. Preserving them eliminates white gaps and chopped lines.
                 if segment.get("type") in ["stroke", "travel"] or self.style_name in [
-                    "Professional", "Sketch", "Educational", "Organic Sketch", "Hatch Shading", "Clean Outline", "Line Art (Skeleton)"
+                    "Professional", "Sketch", "Educational", "Organic Sketch", "Hatch Shading", 
+                    "Clean Outline", "Line Art (Skeleton)", "Blueprint Drafting", "Engraving Hatch", "Ribbon Flow"
                 ]:
                     new_seg = dict(segment)
                     new_seg["points"] = scaled_pts
@@ -141,15 +150,23 @@ class AnimatedImageItem(QGraphicsObject):
         self.anim_type       = "Draw"
         self.anim_dir        = "From Left"
         self.anim_easing     = "Linear"
+        self.entrance_mode   = "draw" # "draw" or "motion"
+        self.motion_settings = {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth"
+        }
         self.sfx_name        = "None"
         self.sfx_volume      = 100
+        self._plan_cache     = {}
 
-        # High-quality downsampling for huge images to avoid aliasing pixelation
-        # Limit to 1080 internally to prevent heavy QPixmap composition lag at 60 FPS
-        max_res = 1080.0
+        # Preserve full native image resolution (up to 4096px safety ceiling for extreme multi-megapixel images)
+        # Never destroy raw pixels on standard 1080p, 2K, or 4K assets
+        max_safe_res = 4096.0
         w, h = self._pixmap.width(), self._pixmap.height()
-        if w > max_res or h > max_res:
-            scale_factor = min(max_res / w, max_res / h)
+        if w > max_safe_res or h > max_safe_res:
+            scale_factor = min(max_safe_res / w, max_safe_res / h)
             new_size = QSize(int(w * scale_factor), int(h * scale_factor))
             self._pixmap = self._pixmap.scaled(
                 new_size, 
@@ -198,13 +215,38 @@ class AnimatedImageItem(QGraphicsObject):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def replace_image(self, new_pixmap: QPixmap):
+    def replace_image(self, new_pixmap: QPixmap) -> bool:
+        # Pre-check: reject corrupted or null pixmaps to protect existing image
+        if new_pixmap is None or new_pixmap.isNull():
+            return False
+
+        # Thread isolation: Safely stop and disconnect any active worker thread for the old image
+        old_thread = getattr(self, '_thread', None)
+        if old_thread is not None:
+            try:
+                import shiboken6
+                if shiboken6.isValid(old_thread) and old_thread.isRunning():
+                    old_worker = getattr(self, '_worker', None)
+                    if old_worker is not None:
+                        try:
+                            old_worker.cancel()
+                            old_worker.finished.disconnect()
+                        except Exception:
+                            pass
+                    old_thread.quit()
+                    old_thread.wait(300)
+            except Exception:
+                pass
+            finally:
+                self._thread = None
+                self._worker = None
+
         self._pixmap = new_pixmap
         
-        max_res = 1080.0
+        max_safe_res = 4096.0
         w, h = self._pixmap.width(), self._pixmap.height()
-        if w > max_res or h > max_res:
-            scale_factor = min(max_res / w, max_res / h)
+        if w > max_safe_res or h > max_safe_res:
+            scale_factor = min(max_safe_res / w, max_safe_res / h)
             new_size = QSize(int(w * scale_factor), int(h * scale_factor))
             self._pixmap = self._pixmap.scaled(
                 new_size, 
@@ -218,11 +260,28 @@ class AnimatedImageItem(QGraphicsObject):
         self._composite_buffer = QImage(self._pixmap.size(), QImage.Format.Format_ARGB32_Premultiplied)
         self._composite_buffer.fill(Qt.GlobalColor.transparent)
         
-        self.prepareGeometryChange()
+        # Comprehensive cache and state purge: eliminate all traces of previous image's vector lines
+        if hasattr(self, '_plan_cache') and isinstance(self._plan_cache, dict):
+            self._plan_cache.clear()
+        self._timed_segments = []
+        self._total_calculated_time = 1.0
+
+        if hasattr(self, '_total_length'):
+            delattr(self, '_total_length')
+        if hasattr(self, '_analysis_image'):
+            delattr(self, '_analysis_image')
+        if hasattr(self, '_cached_pixmap_id'):
+            delattr(self, '_cached_pixmap_id')
+
+        self._active_paint_idx = 0
+        self._active_target_idx = 0
         self._last_drawn_progress = -1.0
         self._plan_loaded = False
+
+        self.prepareGeometryChange()
         self.build_plan_async()
         self.update()
+        return True
 
     def set_anim_duration(self, duration: float):
         if self._anim_duration != duration:
@@ -249,6 +308,22 @@ class AnimatedImageItem(QGraphicsObject):
 
     def build_plan_async(self):
         """Start background plan building. Call this before Play."""
+        cache_key = (self.drawing_style, getattr(self, 'drawing_direction', 'auto'), round(self._anim_duration, 1))
+        if cache_key in getattr(self, '_plan_cache', {}):
+            self._timed_segments = self._plan_cache[cache_key]
+            last_end = self._timed_segments[-1].get("end_time", self._anim_duration) if self._timed_segments else 1.0
+            self._total_calculated_time = max(0.01, float(last_end))
+            self._plan_loaded = True
+            self._is_loading_plan = False
+            self._loading_timer.stop()
+            self._last_drawn_progress = -1.0
+            self._active_paint_idx = 0
+            self._active_target_idx = 0
+            self.set_progress(self._progress)
+            self.update()
+            self.plan_ready.emit()
+            return
+
         if self._is_loading_plan:
             self._needs_rebuild = True
             return
@@ -264,13 +339,13 @@ class AnimatedImageItem(QGraphicsObject):
             try:
                 import shiboken6
                 if shiboken6.isValid(old_thread) and old_thread.isRunning():
-                    try:
-                        if getattr(self, '_worker', None) is not None:
+                    if getattr(self, '_worker', None) is not None:
+                        try:
+                            self._worker.cancel()
                             self._worker.finished.disconnect()
-                    except Exception:
-                        pass
+                        except Exception:
+                            pass
                     old_thread.quit()
-                    old_thread.wait(500)
             except Exception:
                 pass
             finally:
@@ -395,6 +470,12 @@ class AnimatedImageItem(QGraphicsObject):
         self._is_loading_plan       = False
         self._loading_timer.stop()
         
+        cache_key = (self.drawing_style, getattr(self, 'drawing_direction', 'auto'), round(self._anim_duration, 1))
+        if not hasattr(self, '_plan_cache'):
+            self._plan_cache = {}
+        if segments:
+            self._plan_cache[cache_key] = segments
+        
         if getattr(self, '_needs_rebuild', False):
             self._needs_rebuild = False
             self._plan_loaded = False
@@ -477,6 +558,8 @@ class AnimatedImageItem(QGraphicsObject):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        if hasattr(QPainter.RenderHint, 'LosslessImageRendering'):
+            painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
 
         p = self._get_effective_progress()
 
@@ -606,6 +689,8 @@ class AnimatedImageItem(QGraphicsObject):
         self._last_drawn_progress = p
 
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        if hasattr(QPainter.RenderHint, 'LosslessImageRendering'):
+            painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
         
         # All styles use the Solid Reveal approach (masking):
         # We scribble thick black patterns into _scribble_buffer, and use it as an alpha mask 
@@ -613,6 +698,8 @@ class AnimatedImageItem(QGraphicsObject):
         self._composite_buffer.fill(Qt.GlobalColor.transparent)
         comp_painter = QPainter(self._composite_buffer)
         comp_painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        if hasattr(QPainter.RenderHint, 'LosslessImageRendering'):
+            comp_painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
         comp_painter.drawImage(0, 0, self._scribble_buffer)
         comp_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
         comp_painter.drawImage(0, 0, self._qimage)
@@ -935,6 +1022,11 @@ class AnimatedImageItem(QGraphicsObject):
             super().mouseReleaseEvent(event)
         if not getattr(self, "_hover_handle", None):
             self.setCursor(Qt.CursorShape.OpenHandCursor)
+        # Capture live transform for motion graphics so enlarged scale / pos is preserved
+        self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+        self._motion_target_scale = float(self.scale())
+        self._motion_target_rotation = float(self.rotation())
+        self._motion_target_opacity = float(self.opacity())
 
     def to_dict(self):
         return {
@@ -953,6 +1045,13 @@ class AnimatedImageItem(QGraphicsObject):
             "anim_easing": self.anim_easing,
             "sfx_name": getattr(self, "sfx_name", "None"),
             "sfx_volume": getattr(self, "sfx_volume", 100),
+            "entrance_mode": getattr(self, "entrance_mode", "draw"),
+            "motion_settings": getattr(self, "motion_settings", {
+                "style": "hand_drag",
+                "direction": "left",
+                "duration": 1.5,
+                "easing": "smooth"
+            }),
             "image_path": getattr(self, 'image_path', "")
         }
 
@@ -975,8 +1074,19 @@ class AnimatedImageItem(QGraphicsObject):
         item.anim_type = data.get("anim_type", "Draw")
         item.anim_dir = data.get("anim_dir", "From Left")
         item.anim_easing = data.get("anim_easing", "Linear")
+        item.entrance_mode = data.get("entrance_mode", "draw")
+        item.motion_settings = data.get("motion_settings", {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth"
+        })
         item.sfx_name = data.get("sfx_name", "None")
         item.sfx_volume = data.get("sfx_volume", 100)
+        item._motion_target_pos = QPointF(item.pos().x(), item.pos().y())
+        item._motion_target_scale = float(item.scale())
+        item._motion_target_rotation = float(item.rotation())
+        item._motion_target_opacity = float(item.opacity())
         return item
 
     def cleanup(self):

@@ -1,108 +1,72 @@
 import cv2
 import numpy as np
-import random
 import math
 from PySide6.QtCore import QPointF
 from typing import List, Dict, Any
 
-def _generate_organic_serpentine_fill(mask: np.ndarray, step: int = 12, map_scale: float = 1.0, scale: float = 1.0) -> List[List[QPointF]]:
+def generate_clean_diagonal_shades(pocket_mask: np.ndarray, step: int = 12, map_scale: float = 1.0, scale: float = 1.0) -> List[List[QPointF]]:
     """
-    Generates authentic +45° diagonal serpentine shading sweeps.
-    Simulates a human artist sketching with a natural slanted wrist angle (charcoal / 6B pencil).
-    Guarantees 100% solid reveal coverage with zero flimsy wireframes.
+    Generates authentic +45° diagonal pencil shading strokes strictly within the solid pocket mask.
+    Each stroke is an independent segment to prevent dragging across empty canvas space.
     """
     def map_pt(px, py):
         return (px / map_scale) / scale, (py / map_scale) / scale
 
-    h, w = mask.shape
-    y_indices, x_indices = np.where(mask > 0)
+    h, w = pocket_mask.shape
+    y_indices, x_indices = np.where(pocket_mask > 0)
     if len(y_indices) == 0:
         return []
 
-    # Calculate diagonal bounds (d = y - x)
     d_vals = y_indices.astype(np.int32) - x_indices.astype(np.int32)
     d_min = int(np.min(d_vals))
     d_max = int(np.max(d_vals))
 
-    d_targets = []
-    cur_d = d_min + min(step // 2, max(0, (d_max - d_min) // 2))
-    while cur_d <= d_max:
-        d_targets.append(cur_d)
-        cur_d += step
-    if d_targets and (d_max - d_targets[-1]) >= max(2, step // 3):
-        d_targets.append(d_max)
-    if d_targets and (d_targets[0] - d_min) >= max(2, step // 3):
-        d_targets.insert(0, d_min)
+    paths = []
+    going_forward = True
 
-    diagonal_strips = []
-    for d in d_targets:
-        # For line y = x + d:
-        # 0 <= x < w and 0 <= x + d < h ==> max(0, -d) <= x <= min(w - 1, h - 1 - d)
+    for d in range(d_min + max(2, step // 2), d_max + 1, step):
         x_start = max(0, -d)
         x_end = min(w - 1, h - 1 - d)
+        if x_start > x_end:
+            continue
 
-        if x_start <= x_end:
-            xs = np.arange(x_start, x_end + 1)
-            ys = xs + d
-            diag_pixels = mask[ys, xs] > 0
+        xs = np.arange(x_start, x_end + 1)
+        ys = xs + d
+        diag_pixels = pocket_mask[ys, xs] > 0
 
-            diff = np.diff(np.pad(diag_pixels.astype(np.int8), (1, 1), 'constant'))
-            starts = np.where(diff == 1)[0]
-            ends = np.where(diff == -1)[0] - 1
+        diff = np.diff(np.pad(diag_pixels.astype(np.int8), (1, 1), 'constant'))
+        starts = np.where(diff == 1)[0]
+        ends = np.where(diff == -1)[0] - 1
 
-            strip_segs = []
-            for st_idx, en_idx in zip(starts, ends):
-                if en_idx >= st_idx:
-                    p1 = (int(xs[st_idx]), int(ys[st_idx]))
-                    p2 = (int(xs[en_idx]), int(ys[en_idx]))
-                    if p1 == p2:
-                        p2 = (min(w - 1, p1[0] + 1), min(h - 1, p1[1] + 1))
-                    strip_segs.append((p1, p2))
-            if strip_segs:
-                diagonal_strips.append(strip_segs)
+        segs = []
+        for st_idx, en_idx in zip(starts, ends):
+            if en_idx >= st_idx:
+                p1 = (int(xs[st_idx]), int(ys[st_idx]))
+                p2 = (int(xs[en_idx]), int(ys[en_idx]))
+                if p1 == p2:
+                    p2 = (min(w - 1, p1[0] + 1), min(h - 1, p1[1] + 1))
+                segs.append((p1, p2))
 
-    if not diagonal_strips:
-        return []
-
-    continuous_path = []
-    going_forward = True
-    last_pt = None
-
-    for strip in diagonal_strips:
-        sorted_segs = sorted(strip, key=lambda s: s[0][0])
         if not going_forward:
-            sorted_segs.reverse()
+            segs.reverse()
 
-        for (p_a, p_b) in sorted_segs:
+        for (p_a, p_b) in segs:
             p_start = p_a if going_forward else p_b
             p_end = p_b if going_forward else p_a
-
-            # Smooth organic wrist turn between diagonal strips
-            if last_pt is not None:
-                mid_x = (last_pt[0] + p_start[0]) / 2.0
-                mid_y = (last_pt[1] + p_start[1]) / 2.0
-                turn_offset = min(6.0, math.hypot(p_start[0] - last_pt[0], p_start[1] - last_pt[1]) * 0.4)
-                if going_forward:
-                    continuous_path.append(QPointF(*map_pt(mid_x - turn_offset, mid_y + turn_offset)))
-                else:
-                    continuous_path.append(QPointF(*map_pt(mid_x + turn_offset, mid_y - turn_offset)))
-
-            continuous_path.append(QPointF(*map_pt(p_start[0], p_start[1])))
-            continuous_path.append(QPointF(*map_pt(p_end[0], p_end[1])))
-            last_pt = p_end
+            paths.append([QPointF(*map_pt(p_start[0], p_start[1])), QPointF(*map_pt(p_end[0], p_end[1]))])
 
         going_forward = not going_forward
 
-    if len(continuous_path) >= 2:
-        return [continuous_path]
-    return []
+    return paths
 
-def generate_scribble_islands(mask: np.ndarray, scale: float) -> List[Dict[str, Any]]:
+def generate_scribble_islands(mask: np.ndarray, scale: float = 1.0) -> List[Dict[str, Any]]:
     """
-    Organic Sketch (Solid Artistic Charcoal / Bold Pencil Flow):
-    - 1. Bold expressive structural contours.
-    - 2. Solid, broad serpentine shading sweeps with 100% solid reveal coverage.
-    - 3. Completely eliminates weak, flimsy wireframe scratches.
+    Organic Sketch (Freehand Artist Simulation):
+    - Phase 1: Gestural Perspective Rough-in (15% duration) -> dynamic guide curves.
+    - Phase 2: Organic Freehand Contours (45% duration) -> expressive silhouettes & line-work.
+    - Phase 3: Slanted 45° Pencil Shading (40% duration) -> localized cross-hatching on shadows.
+    - Zero blanket sweeps over empty space.
+    - Zero early completion, finishes smoothly at duration.
     """
     h, w = mask.shape
     max_dim = 1500.0
@@ -116,86 +80,120 @@ def generate_scribble_islands(mask: np.ndarray, scale: float) -> List[Dict[str, 
         work_mask = cv2.resize(mask, (work_w, work_h), interpolation=cv2.INTER_NEAREST)
         
     _, work_mask = cv2.threshold(work_mask, 127, 255, cv2.THRESH_BINARY)
+    heal_k = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    work_mask = cv2.morphologyEx(work_mask, cv2.MORPH_CLOSE, heal_k)
     
-    # Heal micro-breaks
-    heal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    work_mask = cv2.morphologyEx(work_mask, cv2.MORPH_CLOSE, heal_kernel)
-    
-    def map_to_original(mx, my):
-        return (mx / map_scale) / scale, (my / map_scale) / scale
+    def map_pt(px, py):
+        return (px / map_scale) / scale, (py / map_scale) / scale
 
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(work_mask, connectivity=8)
-    
-    islands = []
-    erode_step = max(3, int(6.0 * map_scale))
-    erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_step, erode_step))
-    fill_scan_step = max(5, int(12.0 * map_scale))
-    
-    for label_idx in range(1, num_labels):
-        x, y, cw, ch, area = stats[label_idx]
-        cx, cy = centroids[label_idx]
+    y_indices, x_indices = np.where(work_mask > 0)
+    if len(y_indices) == 0:
+        return []
         
-        if area < 15:
-            p1 = QPointF(*map_to_original(max(0, cx - 1.5), cy))
-            p2 = QPointF(*map_to_original(min(work_mask.shape[1] - 1, cx + 1.5), cy))
-            islands.append({
-                "paths": [[p1, p2]],
-                "rect": (x / scale, y / scale, cw / scale, ch / scale),
-                "centroid": (cx / scale, cy / scale),
-                "area": float(area),
-                "is_dot": True
-            })
-            continue
-            
-        comp_mask = (labels == label_idx).astype(np.uint8) * 255
-        comp_paths = []
-        
-        # 1. Bold expressive contours (both outer boundaries and inner loops/holes)
-        contours, hierarchy = cv2.findContours(comp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            arc_len = cv2.arcLength(cnt, True)
-            if arc_len >= 8:
-                epsilon = 0.003 * arc_len
-                approx = cv2.approxPolyDP(cnt, epsilon, True)
-                path = []
-                for p in approx:
-                    px, py = map_to_original(p[0][0], p[0][1])
-                    path.append(QPointF(px, py))
-                if len(path) >= 2:
-                    path.append(path[0])
-                    comp_paths.append(path)
-            else:
-                p1 = QPointF(*map_to_original(cx - 1.5, cy))
-                p2 = QPointF(*map_to_original(cx + 1.5, cy))
-                comp_paths.append([p1, p2])
-                
-        # 2. Solid, broad serpentine shading sweeps for medium & solid areas
-        inner_mask = cv2.erode(comp_mask, erode_kernel, iterations=1)
-        if cv2.countNonZero(inner_mask) > 0:
-            n_inner, l_inner, s_inner, c_inner = cv2.connectedComponentsWithStats(inner_mask, connectivity=8)
-            for inner_lbl in range(1, n_inner):
-                sub_mask = (l_inner == inner_lbl).astype(np.uint8) * 255
-                sweep_paths = _generate_organic_serpentine_fill(sub_mask, step=fill_scan_step, map_scale=map_scale, scale=scale)
-                if sweep_paths:
-                    comp_paths.extend(sweep_paths)
+    x_min, x_max = float(np.min(x_indices)), float(np.max(x_indices))
+    y_min, y_max = float(np.min(y_indices)), float(np.max(y_indices))
+    cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+    
+    # 1. Phase 1: Gestural Perspective Rough-in Guide Curves
+    gestural_paths = []
+    # Primary perspective diagonal axis
+    p1 = QPointF(*map_pt(x_min + 15.0, y_min + 15.0))
+    mid1 = QPointF(*map_pt(cx - 10.0, cy + 10.0))
+    p2 = QPointF(*map_pt(x_max - 15.0, y_max - 15.0))
+    gestural_paths.append([p1, mid1, p2])
+    
+    # Counter perspective axis
+    p3 = QPointF(*map_pt(x_max - 20.0, y_min + 20.0))
+    mid2 = QPointF(*map_pt(cx + 10.0, cy - 10.0))
+    p4 = QPointF(*map_pt(x_min + 20.0, y_max - 20.0))
+    gestural_paths.append([p3, mid2, p4])
+    
+    # 2. Phase 2: Organic Freehand Contours
+    contours, hierarchy = cv2.findContours(work_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    contour_paths = []
+    contour_cnts = []
+    
+    if contours:
+        for i, c in enumerate(contours):
+            arc = cv2.arcLength(c, True)
+            if arc >= 6:
+                approx = cv2.approxPolyDP(c, 0.002 * arc, True)
+                if len(approx) >= 3:
+                    pts = [QPointF(*map_pt(pt[0][0], pt[0][1])) for pt in approx]
+                    pts.append(pts[0])
                 else:
-                    # Small inner pocket: place a solid centerline dab to prevent hollow cores
-                    icx, icy = c_inner[inner_lbl]
-                    p1 = QPointF(*map_to_original(max(0, icx - 2.5), icy))
-                    p2 = QPointF(*map_to_original(min(work_mask.shape[1] - 1, icx + 2.5), icy))
-                    comp_paths.append([p1, p2])
+                    pts = [QPointF(*map_pt(pt[0][0], pt[0][1])) for pt in c]
+                    if len(pts) >= 2:
+                        pts.append(pts[0])
+            else:
+                icx = float(np.mean(c[:, 0, 0]))
+                icy = float(np.mean(c[:, 0, 1]))
+                pts = [QPointF(*map_pt(icx - 1.5, icy)), QPointF(*map_pt(icx + 1.5, icy))]
                 
-        if not comp_paths:
-            p1 = QPointF(*map_to_original(cx - 1.5, cy))
-            p2 = QPointF(*map_to_original(cx + 1.5, cy))
-            comp_paths = [[p1, p2]]
-            
-        islands.append({
-            "paths": comp_paths,
-            "rect": (x / scale, y / scale, cw / scale, ch / scale),
-            "centroid": (cx / scale, cy / scale),
-            "area": float(area),
-            "is_dot": False
-        })
+            if pts:
+                contour_paths.append(pts)
+                contour_cnts.append(c)
+                
+    # 3. Phase 3: Slanted 45° Pencil Cross-Hatching for Solid/Shadow Pockets
+    canvas = np.zeros_like(work_mask)
+    if contour_cnts:
+        cv2.drawContours(canvas, contour_cnts, -1, 255, max(8, int(14 * map_scale)))
         
-    return islands
+    unrevealed = (work_mask > 0) & (canvas == 0)
+    n_u, l_u, s_u, _ = cv2.connectedComponentsWithStats(unrevealed.astype(np.uint8) * 255)
+    
+    hatch_step = max(8, int(12.0 * map_scale))
+    hatch_paths = []
+    for u in range(1, n_u):
+        if s_u[u, cv2.CC_STAT_AREA] >= 25:
+            pocket = (l_u == u).astype(np.uint8) * 255
+            diag_shades = generate_clean_diagonal_shades(pocket, step=hatch_step, map_scale=map_scale, scale=scale)
+            hatch_paths.extend(diag_shades)
+
+    from ..base_algorithm import BaseDrawingAlgorithm
+    filter_w = 14.0 * map_scale
+    clean_contours = BaseDrawingAlgorithm.filter_non_overlapping_strokes(
+        contour_paths, work_mask, stroke_width=filter_w, max_overlap_ratio=0.88
+    ) if contour_paths else []
+    
+    clean_hatches = BaseDrawingAlgorithm.filter_non_overlapping_strokes(
+        hatch_paths, work_mask, stroke_width=filter_w, max_overlap_ratio=0.88
+    ) if hatch_paths else []
+
+    islands = [
+        {
+            "name": "Phase 1: Gestural Rough-in",
+            "paths": gestural_paths,
+            "weight": 0.15,
+            "stroke_width": 10.0,
+            "phase": 1,
+            "rect": (x_min / (map_scale * scale), y_min / (map_scale * scale), (x_max - x_min) / (map_scale * scale), (y_max - y_min) / (map_scale * scale)),
+            "centroid": (cx / (map_scale * scale), cy / (map_scale * scale)),
+            "area": float((x_max - x_min) * (y_max - y_min)),
+            "is_dot": False
+        },
+        {
+            "name": "Phase 2: Freehand Contours",
+            "paths": clean_contours,
+            "weight": 0.45,
+            "stroke_width": 14.0,
+            "phase": 2,
+            "rect": (x_min / (map_scale * scale), y_min / (map_scale * scale), (x_max - x_min) / (map_scale * scale), (y_max - y_min) / (map_scale * scale)),
+            "centroid": (cx / (map_scale * scale), cy / (map_scale * scale)),
+            "area": float(len(clean_contours) * 100),
+            "is_dot": False
+        },
+        {
+            "name": "Phase 3: Slanted Pencil Shading",
+            "paths": clean_hatches,
+            "weight": 0.40,
+            "stroke_width": 12.0,
+            "phase": 3,
+            "rect": (x_min / (map_scale * scale), y_min / (map_scale * scale), (x_max - x_min) / (map_scale * scale), (y_max - y_min) / (map_scale * scale)),
+            "centroid": (cx / (map_scale * scale), cy / (map_scale * scale)),
+            "area": float(len(clean_hatches) * 100),
+            "is_dot": False
+        }
+    ]
+    
+    return [isl for isl in islands if isl["paths"]]

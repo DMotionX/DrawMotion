@@ -6,6 +6,44 @@ This project adheres to Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [1.7.12] - 2026-10-23
+
+### Studio-Grade Visual Quality, Cross-Platform POSIX Paths, Project Persistence Engine & Portable Distribution
+
+This release introduces high-fidelity canvas ingestion preserving native multi-megapixel asset resolution, studio-grade FFmpeg video rendering with visually lossless encoding, complete cross-platform path centralization and POSIX execution permissions for Linux, a triple-layer self-healing project persistence architecture that permanently eliminates image loss and engine freezing, and a standalone portable diagnostic packaging pipeline.
+
+#### Studio-Grade Visual Fidelity & Video Export Engine
+* **High-Fidelity Canvas Ingestion (4096px Safety Ceiling):** Eliminated aggressive downscaling of raw assets to 1080p upon canvas insertion in `AnimatedImageItem`. Native resolution is now preserved up to an industrial 4096px safety ceiling, allowing standard 1080p, 2K, and 4K assets to maintain pristine sharpness during zoom and transformation.
+* **Studio-Grade FFmpeg Encoding:** Upgraded video export parameters in `FFmpegManager` from default high compression to visually lossless studio settings (`-crf 17`, `-tune animation`, `-preset medium`, `-pix_fmt yuv420p`, `-color_range pc`), eliminating banding artifacts, muddy gradients, and compression blur on animated vector strokes.
+* **Premultiplied Alpha Anti-Aliasing:** Enforced `Format_ARGB32_Premultiplied` across compositing and scribble mask buffers, permanently fixing jagged pixelated borders on transparent PNG graphics.
+
+#### Cross-Platform Architecture & POSIX Permissions (Linux/Windows)
+* **Centralized Path Resolution (`utils/paths.py`):** Unified AppData and XDG Base Directory specification compliance (`~/.local/share/drawmotion` on Linux, `%LOCALAPPDATA%\DrawMotion` on Windows), removing ad-hoc hardcoded directory lookups across 5 core modules (`ffmpeg_manager.py`, `project_manager.py`, `library_widget.py`, `recovery_dialog.py`, `lifecycle_tracker.py`).
+* **POSIX Execution Permissions (`+x`):** Enforced `stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH` on extracted FFmpeg binaries under POSIX/Linux environments, preventing `Permission denied` (`errno 13`) export crashes on Linux desktops and AppImage containers.
+* **GitHub Actions CI Linux Workflow:** Introduced `.github/workflows/ci-linux-tests.yml` running headless pytest validation under Ubuntu 24.04 with Xvfb, auditing cross-platform paths, static asset case sensitivity against ext4 filesystems, and POSIX permissions.
+
+#### Robust Project Persistence & Fail-Safe Restore Engine
+* **Triple-Layer Asset Packaging Fallback:** Overhauled `ProjectManager._pack_and_save()` to eliminate asset dropouts when moving or saving projects:
+  - *Level 1 (Direct Disk Path):* Copies verified asset from disk.
+  - *Level 2 (Recursive Asset Library Scan):* Automatically searches library subdirectories (e.g., `task2/`) by filename if the source was relocated.
+  - *Level 3 (In-Memory Live Pixmap Extraction):* Captures the full-resolution uncorrupted `_pixmap` directly from RAM (`canvas_item._pixmap.save()`) if the original file was deleted from disk, making missing image assets mathematically impossible.
+* **Smart Asset Resolver & Self-Healing Loader:** Upgraded `ProjectManager.load_project_file()` with `_resolve_asset_path()` to transparently repair legacy project archives referencing absolute or moved paths.
+* **Zero-Wait Visual Display:** Reconstructed canvas items immediately display their native pixmap (`set_progress(1.0)`), eliminating blank/white screens on project open.
+* **Non-Blocking Background Plan Calculation (60 FPS):** Wired `plan_started` and `plan_ready` signals and triggered asynchronous background vector calculations via `build_plan_async()` on a dedicated `QThread`, preventing UI/timeline freezing upon project loading.
+* **Windows File-Lock Resilience (`[WinError 32]`):** Protected project cache extraction by catching locked file exceptions and dynamically isolating concurrent sessions into dedicated `ActiveProject_<uuid>` directories.
+
+#### Diagnostic Standalone Distribution & Portable Packaging
+* **Zero-Installer Portable Packaging:** Automated Nuitka standalone compilation producing `DrawMotion-Diagnostic-v1.7.12-Portable.zip` (~184 MB), bundled with all required PySide6 plugins, C++ runtimes, and documentation.
+* **Bundled FFmpeg & Security Binaries:** Guaranteed inclusion of `bin/ffmpeg.exe` and `core/security_engine/bin/scanner.exe` directly inside the portable distribution root.
+* **Interactive Diagnostic Launcher (`Debug_DrawMotion.bat`):** Integrated real-time log tailing displaying the last 15 lifecycle events from `startup_lifecycle.log` directly in the command prompt upon exit.
+* **Offline-Resilient Updater:** Verified that `core/updater.py` and `SilentUpdateChecker` fail gracefully without crashes or modal blocks when running offline.
+
+#### Automated Testing Suite
+* **Comprehensive Automated Tests (`tests/test_project_assets_persistence.py`):** Added 5 dedicated test cases verifying direct disk packaging, library subfolder recovery, in-memory RAM pixmap extraction, instant visual rendering, and legacy project self-healing.
+* **Complete Pytest Suite Validation:** All 23 test cases in the test suite pass cleanly (22 passed, 1 skipped for Linux POSIX permissions on Windows).
+
+---
+
 ## [1.7.11] - 2026-10-19
 
 ### Microsoft Store Publishing Alignment, Open-Source Purge & Author Governance

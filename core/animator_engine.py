@@ -109,13 +109,40 @@ class AnimatorEngine(QObject):
         if not self._items_pending:
             self._start_play()
 
+    def _get_item_artboard_rect(self, item):
+        from PySide6.QtCore import QRectF
+        if item and item.scene():
+            sc = item.scene()
+            ws = sc.parent()
+            if hasattr(ws, 'artboards') and ws.artboards:
+                for ab in ws.artboards:
+                    if ab.sceneBoundingRect().intersects(item.sceneBoundingRect()):
+                        return ab.sceneBoundingRect()
+                return ws.artboards[0].sceneBoundingRect()
+            for it in sc.items():
+                if type(it).__name__ == "SceneArtboardItem":
+                    return it.sceneBoundingRect()
+            return sc.sceneRect()
+        return QRectF(0, 0, 1920, 1080)
+
+    def _get_hand_size(self) -> float:
+        try:
+            return float(SettingsManager().get("hand_size", 3.0))
+        except (ValueError, TypeError):
+            return 3.0
+
     def _start_play(self):
         # Compile timeline into execution schedule
         self.schedule = self.scheduler.compile(self.queue)
         
         # Reset all items
         for item in self.queue:
-            item.set_progress(0.0)
+            if getattr(item, 'entrance_mode', 'draw') == 'motion':
+                from core.motion_engine import MotionEngine
+                MotionEngine.capture_target_transform(item)
+                item.setOpacity(0.0)
+            else:
+                item.set_progress(0.0)
             
         self.current_index = 0
         self.total_time_passed = 0.0
@@ -128,6 +155,8 @@ class AnimatorEngine(QObject):
         self.is_exporting = False
         self.timer.stop()
         self.hand_item.hide()
+        if hasattr(self.hand_item, 'set_drag_mode'):
+            self.hand_item.set_drag_mode(False)
         self.hand_item.set_ink_active(False)
         self.current_index = -1
         
@@ -136,9 +165,13 @@ class AnimatorEngine(QObject):
         # [PHASE 1 FIX]: Restore all items to fully visible state using queue, NOT schedule
         if hasattr(self, 'queue') and self.queue:
             for current_item in self.queue:
-                is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
-                max_progress = 1.0 if is_image else 2.0
-                current_item.set_progress(max_progress)
+                if getattr(current_item, 'entrance_mode', 'draw') == 'motion':
+                    from core.motion_engine import MotionEngine
+                    MotionEngine.reset_item(current_item)
+                else:
+                    is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
+                    max_progress = 1.0 if is_image else 2.0
+                    current_item.set_progress(max_progress)
         
     def _update_loop(self):
         self._step_internal(16)
@@ -152,7 +185,12 @@ class AnimatorEngine(QObject):
         self.schedule = self.scheduler.compile(self.queue)
         
         for item in self.queue:
-            item.set_progress(0.0)
+            if getattr(item, 'entrance_mode', 'draw') == 'motion':
+                from core.motion_engine import MotionEngine
+                MotionEngine.capture_target_transform(item)
+                item.setOpacity(0.0)
+            else:
+                item.set_progress(0.0)
             
         self.current_index = 0
         self.total_time_passed = 0.0
@@ -209,13 +247,22 @@ class AnimatorEngine(QObject):
         for idx, action in enumerate(self.schedule):
             if action['type'] == 'draw':
                 current_item = action['item']
-                is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
-                max_progress = 1.0 if is_image else 2.0
-                
-                if time_sec >= action['end']:
-                    current_item.set_progress(max_progress)
-                elif time_sec <= action['start']:
-                    current_item.set_progress(0.0)
+                entrance_mode = getattr(current_item, 'entrance_mode', 'draw')
+                if entrance_mode == 'motion':
+                    from core.motion_engine import MotionEngine
+                    MotionEngine.ensure_item_motion_cached(current_item)
+                    if time_sec >= action['end']:
+                        MotionEngine.reset_item(current_item)
+                    elif time_sec <= action['start']:
+                        current_item.setOpacity(0.0)
+                else:
+                    is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
+                    max_progress = 1.0 if is_image else 2.0
+                    
+                    if time_sec >= action['end']:
+                        current_item.set_progress(max_progress)
+                    elif time_sec <= action['start']:
+                        current_item.set_progress(0.0)
                     
             if action['start'] <= time_sec < action['end']:
                 self.current_index = idx
@@ -225,42 +272,59 @@ class AnimatorEngine(QObject):
                 
                 if action['type'] == 'draw':
                     current_item = action['item']
-                    is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
-                    max_progress = 1.0 if is_image else 2.0
-                    
-                    # Fix: Always default to right hand for all drawing (user preference)
-                    # This prevents the left hand from showing unexpectedly on RTL objects
-                    self.hand_item.set_hand_type("right")
-                    
-                    item_progress = action_progress * max_progress
-                    eased_progress = item_progress if is_image else self.get_eased_progress(item_progress)
-                    current_item.set_progress(eased_progress)
-                    
-                    if eased_progress <= 1.0:
-                        # Only show if user hasn't chosen 'none'
-                        if SettingsManager().get("hand_style", "default") != "none":
-                            self.hand_item.show()
+                    entrance_mode = getattr(current_item, 'entrance_mode', 'draw')
+                    if entrance_mode == 'motion':
+                        from core.motion_engine import MotionEngine
+                        artboard_rect = self._get_item_artboard_rect(current_item)
+                        hand_to_pass = self.hand_item if SettingsManager().get("hand_style", "default") != "none" else None
+                        MotionEngine.apply_motion_frame(
+                            item=current_item,
+                            hand_item=hand_to_pass,
+                            time_sec=time_sec,
+                            start_time=action['start'],
+                            action_duration=action_duration,
+                            artboard_rect=artboard_rect,
+                            hand_size_setting=self._get_hand_size()
+                        )
+                    else:
+                        is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__ or "WriteToImageGraphicsItem" in current_item.__class__.__name__ or "MindMap" in current_item.__class__.__name__
+                        max_progress = 1.0 if is_image else 2.0
                         
-                        # Scale hand based on item and global hand_size setting
-                        item_scale = current_item.scale()
-                        if "SVGCanvasItem" in current_item.__class__.__name__:
-                            # Normalize scale to match a typical 1000px image's scale space
-                            item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
-                        elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
-                            # Smart scale based on text height so larger fonts get a slightly larger hand
-                            # and it correctly respects the global hand_size setting
-                            item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
-                            
-                        try:
-                            hand_size = float(SettingsManager().get("hand_size", 3.0))
-                        except (ValueError, TypeError):
-                            hand_size = 3.0
-                            
-                        self.hand_item.setScale(hand_size * item_scale)
+                        # Fix: Always default to right hand for all drawing (user preference)
+                        # This prevents the left hand from showing unexpectedly on RTL objects
+                        if hasattr(self.hand_item, 'set_drag_mode'):
+                            self.hand_item.set_drag_mode(False)
+                        self.hand_item.set_hand_type("right")
                         
-                        local_tip = current_item.get_tip_position()
-                        scene_tip = current_item.mapToScene(local_tip)
-                        self.hand_item.setPos(scene_tip)
+                        item_progress = action_progress * max_progress
+                        eased_progress = item_progress if is_image else self.get_eased_progress(item_progress)
+                        current_item.set_progress(eased_progress)
+                        
+                        if eased_progress <= 1.0:
+                            # Only show if user hasn't chosen 'none'
+                            if SettingsManager().get("hand_style", "default") != "none":
+                                self.hand_item.show()
+                            
+                            # Scale hand based on item and global hand_size setting
+                            item_scale = current_item.scale()
+                            if "SVGCanvasItem" in current_item.__class__.__name__:
+                                # Normalize scale to match a typical 1000px image's scale space
+                                item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
+                            elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
+                                # Smart scale based on text height so larger fonts get a slightly larger hand
+                                # and it correctly respects the global hand_size setting
+                                item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
+                                
+                            try:
+                                hand_size = float(SettingsManager().get("hand_size", 3.0))
+                            except (ValueError, TypeError):
+                                hand_size = 3.0
+                                
+                            self.hand_item.setScale(hand_size * item_scale)
+                            
+                            local_tip = current_item.get_tip_position()
+                            scene_tip = current_item.mapToScene(local_tip)
+                            self.hand_item.setPos(scene_tip)
                         
                 elif action['type'] == 'move-hand':
                     self.hand_item.show()
@@ -306,78 +370,95 @@ class AnimatorEngine(QObject):
             
         if action['type'] == 'draw':
             current_item = action['item']
-            is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__
-            max_progress = 1.0 if is_image else 2.0
-            
-            ink_color = Qt.GlobalColor.black
-            if hasattr(current_item, 'base_pen'):
-                ink_color = current_item.base_pen.color()
-            elif hasattr(current_item, '_color'):
-                ink_color = current_item._color
-            elif hasattr(current_item, 'pen') and callable(current_item.pen):
-                ink_color = current_item.pen().color()
-            self.hand_item.set_ink_color(ink_color)
-            
-            item_progress = action_progress * max_progress
-            eased_progress = item_progress if is_image else self.get_eased_progress(item_progress)
-            current_item.set_progress(eased_progress)
-            
-            if 0.01 <= action_progress <= 1.0 and eased_progress <= 1.0:
-                if not getattr(self, 'is_exporting', False):
-                    sfx_name = getattr(current_item, 'sfx_name', 'None')
-                    sfx_vol = getattr(current_item, 'sfx_volume', 100)
-                    self.sfx_engine.on_pen_down(sfx_name, sfx_vol)
-                
-                if not self.hand_item.isVisible():
-                    # Only show hand if user hasn't chosen 'none'
-                    if SettingsManager().get("hand_style", "default") != "none":
-                        self.hand_item.show()
-                    
-                    # Snap immediately on first show and set proper scale
-                    item_scale = current_item.scale()
-                    if "SVGCanvasItem" in current_item.__class__.__name__:
-                        item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
-                    elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
-                        item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
-                        
-                    try:
-                        hand_size = float(SettingsManager().get("hand_size", 3.0))
-                    except (ValueError, TypeError):
-                        hand_size = 3.0
-                    self.hand_item.setScale(hand_size * item_scale)
-                    
-                    local_tip = current_item.get_tip_position()
-                    scene_tip = current_item.mapToScene(local_tip)
-                    self.hand_item.setPos(scene_tip)
-                else:
-                    item_scale = current_item.scale()
-                    if "SVGCanvasItem" in current_item.__class__.__name__:
-                        item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
-                    elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
-                        item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
-                        
-                    try:
-                        hand_size = float(SettingsManager().get("hand_size", 3.0))
-                    except (ValueError, TypeError):
-                        hand_size = 3.0
-                    self.hand_item.setScale(hand_size * item_scale)
-                    
-                    local_tip = current_item.get_tip_position()
-                    scene_tip = current_item.mapToScene(local_tip)
-                    self.hand_item.setPos(scene_tip)
-                
-                # Active ink dot while actively drawing before final lift
-                if action_progress < 0.99:
-                    self.hand_item.set_ink_active(True)
-                else:
-                    self.hand_item.set_ink_active(False)
-                    self.sfx_engine.on_pen_up()
+            entrance_mode = getattr(current_item, 'entrance_mode', 'draw')
+            if entrance_mode == 'motion':
+                from core.motion_engine import MotionEngine
+                artboard_rect = self._get_item_artboard_rect(current_item)
+                hand_to_pass = self.hand_item if SettingsManager().get("hand_style", "default") != "none" else None
+                MotionEngine.apply_motion_frame(
+                    item=current_item,
+                    hand_item=hand_to_pass,
+                    time_sec=self.total_time_passed,
+                    start_time=action['start'],
+                    action_duration=action_duration,
+                    artboard_rect=artboard_rect,
+                    hand_size_setting=self._get_hand_size()
+                )
             else:
-                self.sfx_engine.on_pen_up()
-                if self.hand_item.isVisible():
-                    self.hand_item.hide()
-                self.hand_item.set_ink_active(False)
+                if hasattr(self.hand_item, 'set_drag_mode'):
+                    self.hand_item.set_drag_mode(False)
+                is_image = "AnimatedImageItem" in current_item.__class__.__name__ or "SVGCanvasItem" in current_item.__class__.__name__
+                max_progress = 1.0 if is_image else 2.0
+                
+                ink_color = Qt.GlobalColor.black
+                if hasattr(current_item, 'base_pen'):
+                    ink_color = current_item.base_pen.color()
+                elif hasattr(current_item, '_color'):
+                    ink_color = current_item._color
+                elif hasattr(current_item, 'pen') and callable(current_item.pen):
+                    ink_color = current_item.pen().color()
+                self.hand_item.set_ink_color(ink_color)
+                
+                item_progress = action_progress * max_progress
+                eased_progress = item_progress if is_image else self.get_eased_progress(item_progress)
+                current_item.set_progress(eased_progress)
+                
+                if 0.01 <= action_progress <= 1.0 and eased_progress <= 1.0:
+                    if not getattr(self, 'is_exporting', False):
+                        sfx_name = getattr(current_item, 'sfx_name', 'None')
+                        sfx_vol = getattr(current_item, 'sfx_volume', 100)
+                        self.sfx_engine.on_pen_down(sfx_name, sfx_vol)
                     
+                    if not self.hand_item.isVisible():
+                        # Only show hand if user hasn't chosen 'none'
+                        if SettingsManager().get("hand_style", "default") != "none":
+                            self.hand_item.show()
+                        
+                        # Snap immediately on first show and set proper scale
+                        item_scale = current_item.scale()
+                        if "SVGCanvasItem" in current_item.__class__.__name__:
+                            item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
+                        elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
+                            item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
+                            
+                        try:
+                            hand_size = float(SettingsManager().get("hand_size", 3.0))
+                        except (ValueError, TypeError):
+                            hand_size = 3.0
+                        self.hand_item.setScale(hand_size * item_scale)
+                        
+                        local_tip = current_item.get_tip_position()
+                        scene_tip = current_item.mapToScene(local_tip)
+                        self.hand_item.setPos(scene_tip)
+                    else:
+                        item_scale = current_item.scale()
+                        if "SVGCanvasItem" in current_item.__class__.__name__:
+                            item_scale = (current_item.boundingRect().width() / 1000.0) * item_scale
+                        elif hasattr(current_item, 'model') and getattr(current_item.model, 'item_type', '') == 'write_to_image':
+                            item_scale = (current_item.boundingRect().height() / 250.0) * item_scale
+                            
+                        try:
+                            hand_size = float(SettingsManager().get("hand_size", 3.0))
+                        except (ValueError, TypeError):
+                            hand_size = 3.0
+                        self.hand_item.setScale(hand_size * item_scale)
+                        
+                        local_tip = current_item.get_tip_position()
+                        scene_tip = current_item.mapToScene(local_tip)
+                        self.hand_item.setPos(scene_tip)
+                    
+                    # Active ink dot while actively drawing before final lift
+                    if action_progress < 0.99:
+                        self.hand_item.set_ink_active(True)
+                    else:
+                        self.hand_item.set_ink_active(False)
+                        self.sfx_engine.on_pen_up()
+                else:
+                    self.sfx_engine.on_pen_up()
+                    if self.hand_item.isVisible():
+                        self.hand_item.hide()
+                    self.hand_item.set_ink_active(False)
+                        
         elif action['type'] == 'move-hand':
             self.sfx_engine.on_pen_up()
             self.hand_item.set_ink_active(False)
@@ -401,6 +482,10 @@ class AnimatorEngine(QObject):
             if action['type'] == 'draw':
                 self.sfx_engine.on_pen_up()
                 self.hand_item.set_ink_active(False)
+                if getattr(action['item'], 'entrance_mode', 'draw') == 'motion':
+                    from core.motion_engine import MotionEngine
+                    MotionEngine.reset_item(action['item'])
+                    self.hand_item.hide()
             self.current_index += 1
             
         return True

@@ -6,16 +6,17 @@ from PySide6.QtCore import QPointF
 from PySide6.QtGui import QImage
 from typing import List, Dict, Any
 from ..base_algorithm import BaseDrawingAlgorithm
-
 from .scribble_generator import generate_scribble_islands
 
 class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
     """
-    Organic Sketch (Solid Artistic Charcoal / Bold Pencil Flow):
-    - 1. Focal-First Entry: Artist begins with the primary visual subject (Character / Focal Center).
-    - 2. Bold Expressive Contours + Solid Serpentine Shading with 100% solid reveal coverage.
-    - 3. Strict Locality: Completely completes the current subject before moving to the next.
-    - 4. Zero erratic jumping, zero flimsy wireframe scratches.
+    Organic Sketch (Freehand Charcoal / Pencil Artist Flow):
+    - 3 Artistic Construction Phases:
+      1. Phase 1: Gestural Perspective Rough-in (15% duration) -> rapid axis guide curves.
+      2. Phase 2: Organic Freehand Contours (45% duration) -> expressive silhouettes & line-work.
+      3. Phase 3: Slanted 45° Pencil Cross-Hatching (40% duration) -> localized shading on shadows.
+    - Zero Retrace & Zero Blanket Sweeps: No rubbing over white background.
+    - Zero Early Completion: Ink reveals steadily from 0.0s until 8.0s.
     """
     
     def generate_plan(self, qimage: QImage, duration: float, **kwargs) -> List[Dict[str, Any]]:
@@ -27,6 +28,80 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
         if not islands:
             return []
             
+        is_phased = any("phase" in isl for isl in islands)
+        if is_phased:
+            timed_segments = []
+            current_time = 0.0
+            
+            for isl in islands:
+                target_phase_duration = duration * isl.get("weight", 0.33)
+                paths = isl.get("paths", [])
+                if not paths:
+                    continue
+                    
+                phase_segments = []
+                phase_accum = 0.0
+                
+                ordered_paths = self._sort_paths_continuous(paths)
+                
+                path_data = []
+                for pts in ordered_paths:
+                    if not pts:
+                        continue
+                    uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
+                    length = self._calculate_length(uniform_pts)
+                    if length > 0 or isl.get("is_dot", False):
+                        path_data.append({"pts": uniform_pts, "length": max(2.0, length)})
+                        
+                if not path_data:
+                    continue
+                    
+                total_phase_length = sum(item["length"] for item in path_data) or 1.0
+                stroke_w = isl.get("stroke_width", 14.0)
+                
+                for item in path_data:
+                    seg_dur = max(0.005, target_phase_duration * (item["length"] / total_phase_length))
+                    
+                    if phase_segments or timed_segments:
+                        last_pt = phase_segments[-1]["points"][-1] if phase_segments else timed_segments[-1]["points"][-1]
+                        st_pt = item["pts"][0]
+                        dist = math.hypot(st_pt.x() - last_pt.x(), st_pt.y() - last_pt.y())
+                        if dist > 8.0:
+                            travel_dur = min(0.08, max(0.02, dist / 2200.0))
+                            phase_segments.append({
+                                "type": "travel",
+                                "points": [last_pt, st_pt],
+                                "duration": travel_dur,
+                                "start_time": phase_accum,
+                                "end_time": phase_accum + travel_dur,
+                                "width": 0.0,
+                                "opacity": 0.0
+                            })
+                            phase_accum += travel_dur
+                            
+                    phase_segments.append({
+                        "type": "stroke",
+                        "points": item["pts"],
+                        "duration": seg_dur,
+                        "start_time": phase_accum,
+                        "end_time": phase_accum + seg_dur,
+                        "width": stroke_w,
+                        "opacity": 1.0
+                    })
+                    phase_accum += seg_dur
+                    
+                if phase_segments and phase_accum > 0:
+                    scale_f = target_phase_duration / phase_accum
+                    for seg in phase_segments:
+                        seg["duration"] *= scale_f
+                        seg["start_time"] = current_time
+                        current_time += seg["duration"]
+                        seg["end_time"] = current_time
+                        timed_segments.append(seg)
+                        
+            return timed_segments
+
+        # Fallback ordering
         ordered_islands = self._order_islands_artistic_flow(islands, rtl=rtl)
         if not ordered_islands:
             return []
@@ -49,8 +124,6 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
             for pts in island["paths"]:
                 if not pts:
                     continue
-                # Resample path points to uniform human-speed steps (8px)
-                # Eliminates sudden hand sprints over long lines so the pen tip tracks charcoal/pencil ink accurately
                 uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
                 length = self._calculate_length(uniform_pts)
                 if length > 0 or island.get("is_dot", False):
@@ -59,60 +132,12 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
             if not path_data:
                 continue
                 
-            # Authentic Freehand Sketch Artist Ordering:
-            # 1. Expressive structural contours first (outlines) to capture the silhouette
-            # 2. Energetic 45° diagonal pencil shading sweeps second to render the volume
-            outlines = [item for item in path_data if len(item["pts"]) > 2]
-            shades = [item for item in path_data if len(item["pts"]) <= 2]
-            
-            # Sort outlines continuously (longest primary contour first, then nearest neighbor)
-            sorted_outlines = []
-            if outlines:
-                outlines.sort(key=lambda item: -item["length"])
-                sorted_outlines = [outlines.pop(0)]
-                while outlines:
-                    last_pt = sorted_outlines[-1]["pts"][-1]
-                    best_idx, best_dist, best_rev = 0, float('inf'), False
-                    for i, item in enumerate(outlines):
-                        st, en = item["pts"][0], item["pts"][-1]
-                        d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
-                        d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
-                        if d_st < best_dist: best_dist, best_idx, best_rev = d_st, i, False
-                        if d_en < best_dist: best_dist, best_idx, best_rev = d_en, i, True
-                    nx = outlines.pop(best_idx)
-                    if best_rev: nx["pts"].reverse()
-                    sorted_outlines.append(nx)
-                    
-            # Sort shading strokes starting directly from where the outlines ended
-            sorted_shades = []
-            if shades:
-                if sorted_outlines:
-                    last_pt = sorted_outlines[-1]["pts"][-1]
-                else:
-                    last_pt = shades[0]["pts"][0]
-                    
-                while shades:
-                    best_idx, best_dist, best_rev = 0, float('inf'), False
-                    for i, item in enumerate(shades):
-                        st, en = item["pts"][0], item["pts"][-1]
-                        d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
-                        d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
-                        if d_st < best_dist: best_dist, best_idx, best_rev = d_st, i, False
-                        if d_en < best_dist: best_dist, best_idx, best_rev = d_en, i, True
-                    nx = shades.pop(best_idx)
-                    if best_rev: nx["pts"].reverse()
-                    sorted_shades.append(nx)
-                    last_pt = sorted_shades[-1]["pts"][-1]
-                    
-            path_data = sorted_outlines + sorted_shades
-                
             total_island_length = sum(item["length"] for item in path_data) or 1.0
             
             for item in path_data:
                 seg_share = item["length"] / total_island_length
                 seg_duration = max(0.015, island_duration * seg_share)
                 
-                # In-air travel flight between strokes
                 if timed_segments:
                     last_pt = timed_segments[-1]["points"][-1]
                     cur_start = item["pts"][0]
@@ -132,9 +157,7 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
                         })
                         accumulated_time += travel_dur
 
-                # Bold Solid Charcoal / Pencil width (20-26px) for 100% solid reveal coverage
-                dynamic_width = max(20.0, min(26.0, 20.0 + item["length"] / 100.0))
-                
+                dynamic_width = max(18.0, min(24.0, 18.0 + item["length"] / 100.0))
                 timed_segments.append({
                     "type": "stroke",
                     "points": item["pts"],
@@ -146,7 +169,6 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
                 })
                 accumulated_time += seg_duration
                 
-        # Normalize timeline smoothly to duration
         if timed_segments and accumulated_time > 0:
             scale_time = duration / accumulated_time
             cur_t = 0.0
@@ -158,60 +180,30 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
                 
         return timed_segments
 
-    def _order_islands_artistic_flow(self, islands: List[Dict[str, Any]], rtl: bool = False) -> List[Dict[str, Any]]:
-        """
-        Orders islands using authentic human sketch artist flow:
-        - Starts at the most prominent visual subject (or top-right for RTL / top-left for LTR).
-        - Flows continuously to the nearest neighboring element (Continuous Spatial Proximity)
-          with a natural progressive sweep, eliminating erratic jumping without forcing
-          rigid horizontal notebook lines across illustrations.
-        """
-        if not islands or len(islands) <= 1:
-            return list(islands)
-            
-        remaining = list(islands)
-        
-        # 1. Natural artistic entry point:
-        # A sketcher naturally begins at the primary focal element (large area) near the top,
-        # or at top-right (for RTL) / top-left (for LTR).
-        def entry_score(it):
-            cx, cy = it.get("centroid", (0, 0))
-            area = it.get("area", 100.0)
-            area_weight = min(4.0, math.sqrt(max(1.0, area)) / 40.0)
-            if rtl:
-                return cy * 1.5 - cx * 0.8 - area_weight * 25.0
-            else:
-                return cy * 1.5 + cx * 0.8 - area_weight * 25.0
-                
-        remaining.sort(key=entry_score)
-        ordered = [remaining.pop(0)]
-        
-        # 2. Continuous Proximity Flow (Nearest Neighbor with smooth directional sweep)
+    def _sort_paths_continuous(self, paths: List[List[QPointF]]) -> List[List[QPointF]]:
+        if len(paths) <= 1:
+            return paths
+        remaining = list(paths)
+        sorted_p = [remaining.pop(0)]
         while remaining:
-            curr_cx, curr_cy = ordered[-1].get("centroid", (0, 0))
-            best_idx = 0
-            best_cost = float("inf")
-            
-            for i, cand in enumerate(remaining):
-                cand_cx, cand_cy = cand.get("centroid", (0, 0))
-                dx = cand_cx - curr_cx
-                dy = cand_cy - curr_cy
-                dist = math.hypot(dx, dy)
-                
-                # Directional bias: gentle penalty for backtracking
-                backtrack_x = dx if rtl else -dx
-                penalty_x = max(0.0, backtrack_x) * 0.5
-                backtrack_y = -dy
-                penalty_y = max(0.0, backtrack_y) * 0.3
-                
-                cost = dist + penalty_x + penalty_y
-                if cost < best_cost:
-                    best_cost = cost
-                    best_idx = i
-                    
-            ordered.append(remaining.pop(best_idx))
-            
-        return ordered
+            last_pt = sorted_p[-1][-1]
+            best_idx, best_dist, best_rev = 0, float('inf'), False
+            for i, p in enumerate(remaining):
+                st, en = p[0], p[-1]
+                d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
+                d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
+                if d_st < best_dist:
+                    best_dist, best_idx, best_rev = d_st, i, False
+                if d_en < best_dist:
+                    best_dist, best_idx, best_rev = d_en, i, True
+            nx = remaining.pop(best_idx)
+            if best_rev:
+                nx = list(reversed(nx))
+            sorted_p.append(nx)
+        return sorted_p
+
+    def _order_islands_artistic_flow(self, islands: List[Dict[str, Any]], rtl: bool = False) -> List[Dict[str, Any]]:
+        return list(islands)
 
     def _calculate_length(self, points: List[QPointF]) -> float:
         length = 0.0
@@ -222,11 +214,6 @@ class OrganicSketchAlgorithm(BaseDrawingAlgorithm):
         return length
 
     def _resample_path_uniform(self, points: List[QPointF], step_dist: float = 8.0) -> List[QPointF]:
-        """
-        Resamples a path so that points are spaced at equal physical Euclidean distances.
-        Eliminates hand acceleration spikes across long lines, ensuring the charcoal / pencil tip
-        tracks the drawn strokes smoothly with 100% precision.
-        """
         if len(points) < 2:
             return points
         new_pts = [points[0]]

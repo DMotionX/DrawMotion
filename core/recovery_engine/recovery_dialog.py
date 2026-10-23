@@ -247,8 +247,14 @@ class SafeRecoveryDialog(QDialog):
         try:
             from utils.paths import get_app_data_dir
             log_dir = os.path.join(get_app_data_dir(), "Logs")
+            os.makedirs(log_dir, exist_ok=True)
         except Exception:
-            log_dir = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "DrawMotion", "Logs")
+            try:
+                import tempfile
+                log_dir = os.path.join(tempfile.gettempdir(), "DrawMotion_Logs")
+                os.makedirs(log_dir, exist_ok=True)
+            except Exception:
+                log_dir = os.path.expanduser("~")
             
         lifecycle_log = os.path.join(log_dir, "startup_lifecycle.log")
         crash_log = os.path.join(log_dir, "crash_log.txt")

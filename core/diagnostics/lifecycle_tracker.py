@@ -29,10 +29,13 @@ class StartupLifecycleTracker:
             os.makedirs(log_dir, exist_ok=True)
             cls._log_path = os.path.join(log_dir, "startup_lifecycle.log")
         except Exception:
-            # Absolute fallback
-            fallback_dir = os.path.join(os.environ.get("TEMP", os.path.expanduser("~")), "DrawMotion_Logs")
-            os.makedirs(fallback_dir, exist_ok=True)
-            cls._log_path = os.path.join(fallback_dir, "startup_lifecycle.log")
+            try:
+                import tempfile
+                fallback_dir = os.path.join(tempfile.gettempdir(), "DrawMotion_Logs")
+                os.makedirs(fallback_dir, exist_ok=True)
+                cls._log_path = os.path.join(fallback_dir, "startup_lifecycle.log")
+            except Exception:
+                cls._log_path = None
         return cls._log_path
 
     @classmethod

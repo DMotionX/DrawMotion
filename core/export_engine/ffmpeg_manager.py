@@ -1,3 +1,5 @@
+import sys
+import stat
 import subprocess
 import imageio_ffmpeg
 
@@ -52,6 +54,11 @@ class FFmpegManager:
                 shutil.copy2(src_exe, ffmpeg_exe)
             except Exception as e:
                 raise RuntimeError(f"Could not locate or isolate FFmpeg: {e}")
+
+        # Ensure execution permission on POSIX/Linux systems
+        if sys.platform != "win32" and os.path.exists(ffmpeg_exe):
+            mode = os.stat(ffmpeg_exe).st_mode
+            os.chmod(ffmpeg_exe, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
                 
         # Basic integrity check (e.g. > 10MB to ensure it's not a dummy script or corrupted)
         if os.path.getsize(ffmpeg_exe) < 10_000_000:
@@ -196,8 +203,10 @@ class FFmpegManager:
         command.extend([
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
-            '-preset', 'veryfast',
-            '-crf', '20',
+            '-preset', 'medium',
+            '-tune', 'animation',
+            '-crf', '17',
+            '-color_range', 'pc',
             '-maxrate', '60M',
             '-bufsize', '120M',
             '-profile:v', 'high',
