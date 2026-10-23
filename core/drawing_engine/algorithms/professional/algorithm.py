@@ -7,11 +7,14 @@ from .professional_generator import generate_professional_paths
 
 class ProfessionalAlgorithm(BaseDrawingAlgorithm):
     """
-    Professional Vector Drawing (Human Whiteboard Artist Simulation):
-    - Cohesive Semantic Object Clustering: groups figures (e.g. characters) and text blocks 
-      into unified objects to prevent horizontal figure fragmentation.
-    - Zero Blotches: outlines are drawn first, followed immediately by concentric fills.
-    - Zero Pop-in: 100% geometric ink coverage guarantees every single pixel is revealed.
+    Professional Vector Drawing (CAD Structural Hierarchy & Whiteboard Flow):
+    - 4-Tier CAD Structural Assembly:
+      1. Tier 1: External Chassis & Primary Silhouettes (25% duration)
+      2. Tier 2: Major IC Units, Ports & Localized Solid Fills (25% duration)
+      3. Tier 3: Discrete Components, Pins, & Sockets (25% duration)
+      4. Tier 4: Fine Copper Traces, Vias, & Silkscreen Labels (25% duration)
+    - Zero Retrace & Zero Blanket Sweeps: No rubbing over white background.
+    - Zero Early Completion: Ink reveals steadily from 0.0s until 8.0s.
     """
     
     def generate_plan(self, qimage: QImage, duration: float, **kwargs) -> List[Dict[str, Any]]:
@@ -23,7 +26,84 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
         if not islands:
             return []
             
-        # Group islands into cohesive semantic blocks (Headline, Title, Icons/Bulb, Character)
+        # Check if islands are already structured into architectural tiers
+        is_tiered = any("tier" in isl for isl in islands)
+        if is_tiered:
+            timed_segments = []
+            current_time = 0.0
+            
+            for isl in islands:
+                target_tier_duration = duration * isl.get("weight", 0.25)
+                paths = isl.get("paths", [])
+                if not paths:
+                    continue
+                    
+                tier_segments = []
+                tier_accum = 0.0
+                
+                # Order paths continuously using spatial nearest-neighbor
+                ordered_paths = self._sort_paths_continuous(paths)
+                
+                path_data = []
+                for pts in ordered_paths:
+                    if not pts:
+                        continue
+                    uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
+                    length = self._calculate_length(uniform_pts)
+                    if length > 0 or isl.get("is_dot", False):
+                        path_data.append({"pts": uniform_pts, "length": max(2.0, length)})
+                        
+                if not path_data:
+                    continue
+                    
+                total_tier_length = sum(item["length"] for item in path_data) or 1.0
+                stroke_w = isl.get("stroke_width", 14.0)
+                
+                for item in path_data:
+                    seg_dur = max(0.005, target_tier_duration * (item["length"] / total_tier_length))
+                    
+                    # In-air travel flight
+                    if tier_segments or timed_segments:
+                        last_pt = tier_segments[-1]["points"][-1] if tier_segments else timed_segments[-1]["points"][-1]
+                        st_pt = item["pts"][0]
+                        dist = math.hypot(st_pt.x() - last_pt.x(), st_pt.y() - last_pt.y())
+                        if dist > 8.0:
+                            travel_dur = min(0.06, max(0.015, dist / 2500.0))
+                            tier_segments.append({
+                                "type": "travel",
+                                "points": [last_pt, st_pt],
+                                "duration": travel_dur,
+                                "start_time": tier_accum,
+                                "end_time": tier_accum + travel_dur,
+                                "width": 0.0,
+                                "opacity": 0.0
+                            })
+                            tier_accum += travel_dur
+                            
+                    tier_segments.append({
+                        "type": "stroke",
+                        "points": item["pts"],
+                        "duration": seg_dur,
+                        "start_time": tier_accum,
+                        "end_time": tier_accum + seg_dur,
+                        "width": stroke_w,
+                        "opacity": 1.0
+                    })
+                    tier_accum += seg_dur
+                    
+                # Normalize THIS TIER to EXACTLY target_tier_duration!
+                if tier_segments and tier_accum > 0:
+                    scale_f = target_tier_duration / tier_accum
+                    for seg in tier_segments:
+                        seg["duration"] *= scale_f
+                        seg["start_time"] = current_time
+                        current_time += seg["duration"]
+                        seg["end_time"] = current_time
+                        timed_segments.append(seg)
+                        
+            return timed_segments
+            
+        # Fallback Semantic Clustering for non-tiered inputs
         cluster_objects = self._cluster_into_semantic_objects(islands, rtl=rtl)
         if not cluster_objects:
             return []
@@ -31,7 +111,6 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
         num_blocks = len(cluster_objects)
         total_sqrt_area = sum(math.sqrt(max(100.0, obj["w"] * obj["h"])) for obj in cluster_objects) or 1.0
         
-        # Calculate total path length per block
         for obj in cluster_objects:
             obj["total_length"] = sum(
                 sum(self._calculate_length(pts) for pts in isl["paths"] if pts)
@@ -40,14 +119,10 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
             
         total_all_length = sum(obj["total_length"] for obj in cluster_objects) or 1.0
         
-        # Balanced Semantic Budgeting:
-        # Every visual block receives a guaranteed fair time slice (area + length + uniform base).
-        # Prevents heavy fills from starving text or delaying parts to the last 90%!
         for obj in cluster_objects:
             area_factor = math.sqrt(max(100.0, obj["w"] * obj["h"])) / total_sqrt_area
             length_factor = obj["total_length"] / total_all_length
             uniform_factor = 1.0 / num_blocks
-            
             weight = 0.40 * area_factor + 0.45 * length_factor + 0.15 * uniform_factor
             obj["duration"] = duration * weight
             
@@ -66,8 +141,6 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
                 for pts in island["paths"]:
                     if not pts:
                         continue
-                    # Resample path points to uniform human-speed steps (8px)
-                    # Eliminates sudden hand sprints over long lines so the pen tip tracks ink with 100% precision
                     uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
                     length = self._calculate_length(uniform_pts)
                     if length > 0 or island.get("is_dot", False):
@@ -76,33 +149,13 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
                 if not path_data:
                     continue
                     
-                # Outline-first ordering: Primary perimeter outline is drawn first,
-                # followed immediately by relaxed serpentine fills
-                if len(path_data) > 1:
-                    primary = path_data.pop(0)
-                    remaining = path_data
-                    sorted_paths = [primary]
-                    while remaining:
-                        last_pt = sorted_paths[-1]["pts"][-1]
-                        best_idx, best_dist, best_rev = 0, float('inf'), False
-                        for i, item in enumerate(remaining):
-                            st, en = item["pts"][0], item["pts"][-1]
-                            d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
-                            d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
-                            if d_st < best_dist: best_dist, best_idx, best_rev = d_st, i, False
-                            if d_en < best_dist: best_dist, best_idx, best_rev = d_en, i, True
-                        nx = remaining.pop(best_idx)
-                        if best_rev: nx["pts"].reverse()
-                        sorted_paths.append(nx)
-                    path_data = sorted_paths
-                    
                 total_island_length = sum(item["length"] for item in path_data) or 1.0
+                stroke_w = island.get("stroke_width", 14.0)
                 
                 for item in path_data:
                     seg_share = item["length"] / total_island_length
                     seg_duration = max(0.015, island_duration * seg_share)
                     
-                    # In-air travel flight: Smooth transition from last drawn point to current stroke
                     if timed_segments:
                         last_pt = timed_segments[-1]["points"][-1]
                         cur_start = item["pts"][0]
@@ -122,21 +175,17 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
                             })
                             accumulated_time += travel_dur
 
-                    # Generous marker width (22-28px) guarantees seamless, 100% solid coverage with calm step
-                    dynamic_width = max(22.0, min(28.0, 22.0 + item["length"] / 120.0))
-                    
                     timed_segments.append({
                         "type": "stroke",
                         "points": item["pts"],
                         "duration": seg_duration,
                         "start_time": accumulated_time,
                         "end_time": accumulated_time + seg_duration,
-                        "width": dynamic_width,
+                        "width": stroke_w,
                         "opacity": 1.0
                     })
                     accumulated_time += seg_duration
                     
-        # Normalize timeline smoothly to requested duration
         if timed_segments and accumulated_time > 0:
             scale_time = duration / accumulated_time
             cur_t = 0.0
@@ -148,12 +197,30 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
                 
         return timed_segments
 
+    def _sort_paths_continuous(self, paths: List[List[QPointF]]) -> List[List[QPointF]]:
+        if len(paths) <= 1:
+            return paths
+        remaining = list(paths)
+        sorted_p = [remaining.pop(0)]
+        while remaining:
+            last_pt = sorted_p[-1][-1]
+            best_idx, best_dist, best_rev = 0, float('inf'), False
+            for i, p in enumerate(remaining):
+                st, en = p[0], p[-1]
+                d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
+                d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
+                if d_st < best_dist:
+                    best_dist, best_idx, best_rev = d_st, i, False
+                if d_en < best_dist:
+                    best_dist, best_idx, best_rev = d_en, i, True
+            nx = remaining.pop(best_idx)
+            if best_rev:
+                nx = list(reversed(nx))
+            sorted_p.append(nx)
+        return sorted_p
+
     def _cluster_into_semantic_objects(self, islands: List[Dict[str, Any]], rtl: bool = False) -> List[Dict[str, Any]]:
         cluster_objects = BaseDrawingAlgorithm.cluster_into_semantic_objects(islands, rtl=rtl)
-        # Professional Narrative Flow (Hero-Centric Commercial Illustration):
-        # 1. Hero Character (الولد / الشخصية المحورية أولاً) 100% first
-        # 2. Accent Icons (المصباح والرموز المجاورة) 100% second
-        # 3. Written Text (الكلام المكتوب والنصوص في النهاية) 100% third
         text_blocks, heroes, accents = BaseDrawingAlgorithm.categorize_semantic_objects(cluster_objects, rtl=rtl)
         return heroes + accents + text_blocks
 
@@ -166,11 +233,6 @@ class ProfessionalAlgorithm(BaseDrawingAlgorithm):
         return length
 
     def _resample_path_uniform(self, points: List[QPointF], step_dist: float = 8.0) -> List[QPointF]:
-        """
-        Resamples a path so that points are spaced at equal physical Euclidean distances.
-        Eliminates hand acceleration spikes across long lines, ensuring the pen tip glides
-        calmly and tracks ink generation with 100% precision.
-        """
         if len(points) < 2:
             return points
         new_pts = [points[0]]

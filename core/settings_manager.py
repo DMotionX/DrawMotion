@@ -27,6 +27,7 @@ class SettingsManager(QObject):
         # Drawing & Animation
         "default_drawing_style": "solid",
         "hand_size": 3.0,
+        "drag_hand_size": 1.0,
         
         # Export Settings
         "export_resolution": "1080p",

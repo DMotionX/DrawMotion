@@ -103,7 +103,9 @@ class LineArtAlgorithm(BaseDrawingAlgorithm):
                 while edge_data:
                     last_pt = sorted_edges[-1]["pts"][-1]
                     best_idx, best_dist, best_needs_reverse = 0, float('inf'), False
-                    for i, item in enumerate(edge_data):
+                    search_limit = min(len(edge_data), 35)
+                    for i in range(search_limit):
+                        item = edge_data[i]
                         st, en = item["pts"][0], item["pts"][-1]
                         d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
                         d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2
@@ -119,7 +121,9 @@ class LineArtAlgorithm(BaseDrawingAlgorithm):
                 last_pt = sorted_edges[-1]["pts"][-1] if sorted_edges else fill_data[0]["pts"][0]
                 while fill_data:
                     best_idx, best_dist, best_needs_reverse = 0, float('inf'), False
-                    for i, item in enumerate(fill_data):
+                    search_limit = min(len(fill_data), 35)
+                    for i in range(search_limit):
+                        item = fill_data[i]
                         st, en = item["pts"][0], item["pts"][-1]
                         d_st = (st.x() - last_pt.x())**2 + (st.y() - last_pt.y())**2
                         d_en = (en.x() - last_pt.x())**2 + (en.y() - last_pt.y())**2

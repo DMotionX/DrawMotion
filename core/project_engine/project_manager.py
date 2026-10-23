@@ -80,14 +80,9 @@ class ProjectManager(QObject):
         self.auto_save_timer.start(minutes * 60 * 1000)
 
     def _get_app_data_dir(self):
-        """Returns a safe, hidden AppData directory for the application."""
-        app_name = "DrawMotion"
-        if sys.platform == "win32":
-            return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), app_name)
-        elif sys.platform == "darwin":
-            return os.path.join(os.path.expanduser("~"), "Library", "Application Support", app_name)
-        else:
-            return os.path.join(os.path.expanduser("~"), ".local", "share", app_name)
+        """Returns a safe, isolated AppData directory using centralized paths utility."""
+        from utils.paths import get_app_data_dir
+        return get_app_data_dir()
     def get_cache_size(self):
         total_size = 0
         for dirpath, _, filenames in os.walk(self.cache_dir):
@@ -155,27 +150,37 @@ class ProjectManager(QObject):
         return total_size
 
     def list_projects(self):
-        """Returns a list of saved .wip projects metadata."""
+        """Returns a list of saved .wip projects metadata with 100% backward compatibility."""
         projects = []
-        if not os.path.exists(self.projects_dir):
-            return projects
-            
-        for d in os.listdir(self.projects_dir):
-            if d.endswith(".wip"):
-                wip_path = os.path.join(self.projects_dir, d)
-                try:
-                    with zipfile.ZipFile(wip_path, 'r') as zipf:
-                        if 'manifest.json' in zipf.namelist():
-                            with zipf.open('manifest.json') as mf:
-                                manifest = json.load(mf)
-                                projects.append({
-                                    "id": d,
-                                    "name": manifest.get("project_name", d),
-                                    "path": wip_path,
-                                    "created_at": manifest.get("created_at", "")
-                                })
-                except Exception:
-                    pass # Ignore corrupted zips
+        dirs_to_scan = [self.projects_dir]
+        
+        # Backward compatibility for legacy Roaming AppData projects on Windows
+        if sys.platform == "win32":
+            legacy_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "DrawMotion", "Projects")
+            if os.path.exists(legacy_dir) and os.path.normpath(legacy_dir).lower() != os.path.normpath(self.projects_dir).lower():
+                dirs_to_scan.append(legacy_dir)
+                
+        seen_ids = set()
+        for pdir in dirs_to_scan:
+            if not os.path.exists(pdir):
+                continue
+            for d in os.listdir(pdir):
+                if d.endswith(".wip") and d not in seen_ids:
+                    seen_ids.add(d)
+                    wip_path = os.path.join(pdir, d)
+                    try:
+                        with zipfile.ZipFile(wip_path, 'r') as zipf:
+                            if 'manifest.json' in zipf.namelist():
+                                with zipf.open('manifest.json') as mf:
+                                    manifest = json.load(mf)
+                                    projects.append({
+                                        "id": d,
+                                        "name": manifest.get("project_name", d),
+                                        "path": wip_path,
+                                        "created_at": manifest.get("created_at", "")
+                                    })
+                    except Exception:
+                        pass # Ignore corrupted zips
         return projects
 
     def delete_project(self, project_id):
@@ -214,26 +219,83 @@ class ProjectManager(QObject):
                     return base
                 return f"{uuid.uuid4().hex}_{base}"
 
-            # Process Asset Hashing and Copying safely
+            # Map live canvas items by image path and basename for in-memory fail-safe packaging
+            canvas_items_by_path = {}
+            canvas_items_by_name = {}
+            if self.workspace and hasattr(self.workspace, 'user_items'):
+                for u_item in self.workspace.user_items:
+                    ip = getattr(u_item, 'image_path', getattr(u_item, 'svg_filepath', None))
+                    if ip:
+                        canvas_items_by_path[ip] = u_item
+                        canvas_items_by_name[os.path.basename(ip)] = u_item
+
+            # Process Asset Hashing and Copying safely with triple-layer guarantee
             for item in project_data.get("items", []):
-                if 'image_path' in item and item['image_path'] and os.path.exists(item['image_path']):
-                    src_path = item['image_path']
-                    asset_name = _get_safe_asset_name(src_path)
-                    dest_path = os.path.join(assets_dir, asset_name)
-                    shutil.copy2(src_path, dest_path)
-                    
-                    item['image_path'] = f"assets/{asset_name}"
+                img_key = 'image_path' if 'image_path' in item else ('svg_filepath' if 'svg_filepath' in item else None)
+                if not img_key or not item.get(img_key):
+                    continue
+
+                src_path = item[img_key]
+                asset_name = _get_safe_asset_name(src_path)
+                dest_path = os.path.join(assets_dir, asset_name)
+                copied = False
+
+                # Level 1: Direct path exists on disk
+                if os.path.exists(src_path):
+                    try:
+                        shutil.copy2(src_path, dest_path)
+                        copied = True
+                    except Exception:
+                        pass
+
+                # Level 2: Search asset library by filename if moved to a subfolder (e.g. task2)
+                if not copied:
+                    base_name = os.path.basename(src_path)
+                    try:
+                        from utils.paths import get_app_data_dir
+                        lib_dir = os.path.join(get_app_data_dir(), "assets", "library")
+                        if os.path.exists(lib_dir):
+                            for root, _, files in os.walk(lib_dir):
+                                if base_name in files:
+                                    candidate = os.path.join(root, base_name)
+                                    shutil.copy2(candidate, dest_path)
+                                    copied = True
+                                    break
+                    except Exception:
+                        pass
+
+                # Level 3: Bulletproof In-Memory Fallback from Live Canvas Pixmap!
+                if not copied:
+                    canvas_item = canvas_items_by_path.get(src_path) or canvas_items_by_name.get(os.path.basename(src_path))
+                    if canvas_item:
+                        pixmap = getattr(canvas_item, '_pixmap', None)
+                        if pixmap and not pixmap.isNull():
+                            try:
+                                pixmap.save(dest_path, "PNG")
+                                copied = True
+                            except Exception:
+                                pass
+
+                # Record successful packaging in manifest and project JSON
+                if copied and os.path.exists(dest_path):
+                    item[img_key] = f"assets/{asset_name}"
                     manifest_data["asset_hashes"][asset_name] = SerializerEngine.generate_hash(dest_path)
 
             for node in project_data.get("audio", []):
-                if 'file_path' in node and node['file_path'] and os.path.exists(node['file_path']):
+                if 'file_path' in node and node['file_path']:
                     src_path = node['file_path']
                     asset_name = _get_safe_asset_name(src_path)
                     dest_path = os.path.join(assets_dir, asset_name)
-                    shutil.copy2(src_path, dest_path)
-                    
-                    node['file_path'] = f"assets/{asset_name}"
-                    manifest_data["asset_hashes"][asset_name] = SerializerEngine.generate_hash(dest_path)
+                    copied = False
+                    if os.path.exists(src_path):
+                        try:
+                            shutil.copy2(src_path, dest_path)
+                            copied = True
+                        except Exception:
+                            pass
+                    if copied and os.path.exists(dest_path):
+                        node['file_path'] = f"assets/{asset_name}"
+                        manifest_data["asset_hashes"][asset_name] = SerializerEngine.generate_hash(dest_path)
             
             # Write JSON files to temp dir
             with open(os.path.join(temp_dir, "project.json"), 'w', encoding='utf-8') as f:
@@ -331,7 +393,12 @@ class ProjectManager(QObject):
             # We extract it to Cache temporarily to load assets
             extract_dir = os.path.join(self.cache_dir, "ActiveProject")
             if os.path.exists(extract_dir):
-                shutil.rmtree(extract_dir)
+                try:
+                    shutil.rmtree(extract_dir)
+                except Exception:
+                    # If ActiveProject is locked by another process (e.g. running audio player),
+                    # use a dedicated session directory to guarantee fail-safe extraction
+                    extract_dir = os.path.join(self.cache_dir, f"ActiveProject_{uuid.uuid4().hex[:8]}")
             os.makedirs(extract_dir, exist_ok=True)
             
             with zipfile.ZipFile(wip_filepath, 'r') as zipf:
@@ -375,6 +442,39 @@ class ProjectManager(QObject):
             self.workspace.update_scene_indices()
             
             # 2. Reconstruct items (Now safe because Artboards exist)
+            def _resolve_asset_path(raw_path: str) -> str:
+                if not raw_path:
+                    return ""
+                clean_rel = str(raw_path).replace('\\', '/').lstrip('/')
+                
+                # 1. Check relative inside extract_dir
+                p1 = os.path.normpath(os.path.join(extract_dir, clean_rel))
+                if os.path.exists(p1):
+                    return p1
+                
+                # 2. Check if inside extract_dir/assets/
+                base_name = os.path.basename(clean_rel)
+                p2 = os.path.normpath(os.path.join(extract_dir, "assets", base_name))
+                if os.path.exists(p2):
+                    return p2
+                
+                # 3. Check if raw_path is an existing absolute path on disk
+                if os.path.exists(raw_path):
+                    return os.path.normpath(raw_path)
+                
+                # 4. Search asset library (including subfolders like task2)
+                try:
+                    from utils.paths import get_app_data_dir
+                    lib_dir = os.path.join(get_app_data_dir(), "assets", "library")
+                    if os.path.exists(lib_dir):
+                        for root, _, files in os.walk(lib_dir):
+                            if base_name in files:
+                                return os.path.normpath(os.path.join(root, base_name))
+                except Exception:
+                    pass
+                
+                return p1
+
             for idata in data.get("items", []):
                 item_type = idata.get("type")
                 scene_idx = idata.get("scene_index", 0)
@@ -384,11 +484,21 @@ class ProjectManager(QObject):
                     self.workspace.current_scene_index = scene_idx
                     
                 if item_type == "AnimatedImageItem":
-                    if 'image_path' in idata:
-                        idata['image_path'] = os.path.join(extract_dir, idata['image_path'])
+                    if 'image_path' in idata and idata['image_path']:
+                        idata['image_path'] = _resolve_asset_path(idata['image_path'])
                     from graphics.animated_image_item import AnimatedImageItem
                     item = AnimatedImageItem.from_dict(idata)
                     self.workspace.add_item_to_scene(item)
+
+                    # Connect drawing signals and trigger async background planning (60 FPS)
+                    if hasattr(item, 'plan_started') and hasattr(item, 'plan_ready'):
+                        item.plan_started.connect(self.workspace._on_item_plan_started)
+                        item.plan_ready.connect(self.workspace._on_item_plan_ready)
+                    
+                    if hasattr(item, 'build_plan_async'):
+                        item.build_plan_async()
+                    elif hasattr(item, 'update_plan'):
+                        item.update_plan()
                     
                     # EditableTextNode was deprecated and removed.
                 elif item_type == "AnimatedStrokeItem":
@@ -398,7 +508,7 @@ class ProjectManager(QObject):
                     
                 elif item_type == "WriteToImageGraphicsItem":
                     if 'image_path' in idata and idata['image_path']:
-                        idata['image_path'] = os.path.join(extract_dir, idata['image_path'])
+                        idata['image_path'] = _resolve_asset_path(idata['image_path'])
                     from components.write_to_image.graphics_item import WriteToImageGraphicsItem
                     item = WriteToImageGraphicsItem.from_dict(idata)
                     item.canvas_workspace = self.workspace
@@ -406,14 +516,14 @@ class ProjectManager(QObject):
                     
                 elif item_type == "SVGCanvasItem":
                     if 'svg_filepath' in idata and idata['svg_filepath']:
-                        idata['svg_filepath'] = os.path.join(extract_dir, idata['svg_filepath'])
+                        idata['svg_filepath'] = _resolve_asset_path(idata['svg_filepath'])
                     from asset_library.engine.svg_canvas_item import SVGCanvasItem
                     item = SVGCanvasItem.from_dict(idata)
                     self.workspace.add_item_to_scene(item)
                     
                 elif item_type == "AnimatedRasterItem":
                     if 'image_path' in idata and idata['image_path']:
-                        idata['image_path'] = os.path.join(extract_dir, idata['image_path'])
+                        idata['image_path'] = _resolve_asset_path(idata['image_path'])
                     from core.drawing_engine.raster_engine.raster_item import AnimatedRasterItem
                     item = AnimatedRasterItem.from_dict(idata)
                     self.workspace.add_item_to_scene(item)
@@ -425,8 +535,8 @@ class ProjectManager(QObject):
                     
             # 3. Reconstruct audio
             for adata in data.get("audio", []):
-                if 'file_path' in adata:
-                    adata['file_path'] = os.path.join(extract_dir, adata['file_path'])
+                if 'file_path' in adata and adata['file_path']:
+                    adata['file_path'] = _resolve_asset_path(adata['file_path'])
                 from core.audio_engine.audio_node import AudioNodeModel
                 node = AudioNodeModel.from_dict(adata)
                 self.workspace.audio_items.append(node)

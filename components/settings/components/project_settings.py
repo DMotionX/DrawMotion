@@ -226,7 +226,17 @@ class ProjectSettings(SettingsSection):
         self.hand_size_spin.valueChanged.connect(
             lambda v: self.settings.set("hand_size", v)
         )
-        self.add_row(card2, "Hand Size (Scale):", self.hand_size_spin)
+        self.add_row(card2, "Pen Hand Scale:", self.hand_size_spin)
+
+        self.drag_hand_size_spin = QDoubleSpinBox()
+        self.drag_hand_size_spin.setRange(0.1, 10.0)
+        self.drag_hand_size_spin.setSingleStep(0.2)
+        self.drag_hand_size_spin.setLocale(QLocale(QLocale.Language.English))
+        self.drag_hand_size_spin.setValue(self.settings.get("drag_hand_size", 1.0))
+        self.drag_hand_size_spin.valueChanged.connect(
+            lambda v: self.settings.set("drag_hand_size", v)
+        )
+        self.add_row(card2, "Placement Hand Scale:", self.drag_hand_size_spin)
 
         # ── Card 3: Default Save Folder ───────────────────────────────────────
         card3 = self.begin_card("Default Save Folder")

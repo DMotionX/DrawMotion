@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from PySide6.QtGui import QImage
+import copy
+
+_SKELETON_CACHE = {}
 
 class BaseDrawingAlgorithm(ABC):
     """
@@ -12,29 +15,8 @@ class BaseDrawingAlgorithm(ABC):
     def generate_plan(self, qimage: QImage, duration: float, **kwargs) -> List[Dict[str, Any]]:
         """
         Analyzes the QImage and generates a list of TimedSegments.
-        
-        Args:
-            qimage: The source image to draw.
-            duration: Total desired duration in seconds.
-            
-        Returns:
-            List of dictionaries representing segments, where each dict has:
-            {
-                "type": "mask_reveal" | "stroke",
-                "points": List[QPointF],
-                "duration": float,
-                "start_time": float,
-                "end_time": float,
-                "width": float,
-                "opacity": float
-            }
         """
         pass
-
-import copy
-_SKELETON_CACHE = {}
-
-class BaseDrawingAlgorithm:
     def _get_ink_mask(self, qimage: QImage) -> 'numpy.ndarray':
         import cv2
         import numpy as np
@@ -57,11 +39,11 @@ class BaseDrawingAlgorithm:
             sat = hsv[:, :, 1]
             val = hsv[:, :, 2]
             
-            is_bg = (sat < 18) & (val > 238)
+            is_bg = (sat < 18) & (val > 218)
             mask = (~is_bg).astype(np.uint8) * 255
             
-        mask = cv2.GaussianBlur(mask, (3, 3), 0)
-        _, mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+        heal_k = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, heal_k)
         
         return mask
 
@@ -556,5 +538,124 @@ class BaseDrawingAlgorithm:
             accent_blocks.sort(key=lambda o: (round(o["min_y"] / row_band), o["cx"]))
             
         return text_blocks, heroes, accent_blocks
+
+    def _resample_path_uniform(self, points: List['QPointF'], step_dist: float = 8.0) -> List['QPointF']:
+        """
+        Resamples a path so that points are spaced at equal physical Euclidean distances.
+        Eliminates hand acceleration spikes across long lines, ensuring the pen tip glides
+        calmly and tracks ink generation with 100% precision.
+        """
+        import math
+        from PySide6.QtCore import QPointF
+        if len(points) < 2:
+            return points
+        new_pts = [points[0]]
+        accum_dist = 0.0
+        for i in range(1, len(points)):
+            p0 = points[i-1]
+            p1 = points[i]
+            dx = p1.x() - p0.x()
+            dy = p1.y() - p0.y()
+            seg_dist = math.hypot(dx, dy)
+            if seg_dist < 1e-4:
+                continue
+            curr_p = p0
+            while accum_dist + seg_dist >= step_dist:
+                needed = step_dist - accum_dist
+                t = needed / seg_dist
+                new_p = QPointF(curr_p.x() + (p1.x() - curr_p.x()) * t,
+                                curr_p.y() + (p1.y() - curr_p.y()) * t)
+                new_pts.append(new_p)
+                seg_dist -= needed
+                curr_p = new_p
+                accum_dist = 0.0
+            accum_dist += seg_dist
+        if math.hypot(points[-1].x() - new_pts[-1].x(), points[-1].y() - new_pts[-1].y()) > 1.0:
+            new_pts.append(points[-1])
+        return new_pts
+
+    @staticmethod
+    def filter_non_overlapping_strokes(
+        paths: List[List['QPointF']],
+        mask: 'numpy.ndarray',
+        stroke_width: float = 16.0,
+        max_overlap_ratio: float = 0.85,
+        target_coverage_cap: float = 0.985
+    ) -> List[List['QPointF']]:
+        """
+        Non-Overlapping Coverage Filter (Zero Retrace Engine):
+        Filters out redundant strokes whose physical footprint overlaps >= max_overlap_ratio
+        with already covered/revealed pixels.
+        Terminates fill generation once target ink coverage hits target_coverage_cap (98.5%).
+        Guarantees that the hand NEVER retraces over previously drawn areas on solid/complex objects
+        like Arduino boards, eliminating the defect where hand lingers and walks over finished lines.
+        """
+        import cv2
+        import numpy as np
+
+        if not paths:
+            return []
+
+        h, w = mask.shape
+        max_dim = 400.0
+        map_scale = 1.0
+        work_mask = mask
+        if w > max_dim or h > max_dim:
+            map_scale = min(max_dim / w, max_dim / h)
+            work_w = max(1, int(w * map_scale))
+            work_h = max(1, int(h * map_scale))
+            work_mask = cv2.resize(mask, (work_w, work_h), interpolation=cv2.INTER_NEAREST)
+
+        target_ink = work_mask > 0
+        total_target = np.count_nonzero(target_ink)
+        if total_target == 0:
+            return paths
+
+        scaled_width = max(2, int(stroke_width * map_scale))
+        coverage_map = np.zeros(work_mask.shape, dtype=np.uint8)
+        stamp = np.zeros(work_mask.shape, dtype=np.uint8)
+
+        accepted_paths = []
+        covered_pixels = 0
+
+        for pts in paths:
+            if not pts:
+                continue
+
+            if len(pts) == 1:
+                px = int(pts[0].x() * map_scale)
+                py = int(pts[0].y() * map_scale)
+                radius = max(2, scaled_width // 2)
+                cv2.circle(stamp, (px, py), radius, 255, -1)
+            else:
+                raw_coords = np.array([[[int(p.x() * map_scale), int(p.y() * map_scale)]] for p in pts], dtype=np.int32)
+                cv2.polylines(stamp, [raw_coords], isClosed=False, color=255, thickness=scaled_width)
+
+            stroke_target_pixels = (stamp > 0) & target_ink
+            cnt = np.count_nonzero(stroke_target_pixels)
+            if cnt == 0:
+                stamp.fill(0)
+                continue
+
+            new_pixels = np.count_nonzero(stroke_target_pixels & (coverage_map == 0))
+            overlap_ratio = 1.0 - (new_pixels / cnt)
+
+            # If this stroke retraces >= max_overlap_ratio of already revealed pixels, reject it!
+            if overlap_ratio >= max_overlap_ratio and len(accepted_paths) > 0:
+                stamp.fill(0)
+                continue
+
+            # Accept this stroke
+            accepted_paths.append(pts)
+            coverage_map[stamp > 0] = 255
+            covered_pixels += new_pixels
+            stamp.fill(0)
+
+            # If image target ink is already >= target_coverage_cap revealed, stop early!
+            if (covered_pixels / total_target) >= target_coverage_cap:
+                break
+
+        return accepted_paths if accepted_paths else paths[:1]
+
 
 

@@ -234,7 +234,8 @@ class SVGLibraryWidget(QWidget):
             
         # Copy to AppData
         filename = os.path.basename(filepath)
-        appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'DrawMotion', 'assets', 'svg')
+        from utils.paths import get_app_data_dir
+        appdata_dir = os.path.join(get_app_data_dir(), 'assets', 'svg')
         os.makedirs(appdata_dir, exist_ok=True)
         
         target_path = os.path.join(appdata_dir, filename)

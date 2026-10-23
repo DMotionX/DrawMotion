@@ -37,6 +37,8 @@ class HandItem(QGraphicsPixmapItem):
         
         self.right_pixmap = None
         self.left_pixmap = None
+        self.drag_pixmap = None
+        self._is_drag_mode = False
         self.current_type = "right"
         self.current_style = "default"
         
@@ -44,6 +46,7 @@ class HandItem(QGraphicsPixmapItem):
         self._sm = SettingsManager()
         style = self._sm.get("hand_style", "default")
         self.set_hand_style(style)
+        self._load_drag_hand("assets/hand_drag.png")
         
         # Live update: react immediately when user changes hand style in Settings
         self._sm.settings_changed.connect(self._on_setting_changed)
@@ -78,6 +81,26 @@ class HandItem(QGraphicsPixmapItem):
         pix_l = QPixmap(resource_path(left_path))
         if not pix_l.isNull():
             self.left_pixmap = pix_l.scaledToWidth(500, Qt.TransformationMode.SmoothTransformation)
+
+    def _load_drag_hand(self, drag_path: str):
+        pix_d = QPixmap(resource_path(drag_path))
+        if not pix_d.isNull():
+            # Scale 1312px down to balanced default width of 450px
+            self.drag_pixmap = pix_d.scaledToWidth(450, Qt.TransformationMode.SmoothTransformation)
+
+    def set_drag_mode(self, enabled: bool = True):
+        """Switches between regular pen drawing hand and dedicated placement/drag hand."""
+        self._is_drag_mode = enabled
+        if enabled:
+            if not getattr(self, 'drag_pixmap', None):
+                self._load_drag_hand("assets/hand_drag.png")
+            if self.drag_pixmap:
+                self.setPixmap(self.drag_pixmap)
+                # Calibrated finger grip point (X=104, Y=31 in 450px scale) aligns with (0,0)
+                self.setOffset(-104, -31)
+            self.set_ink_active(False)
+        else:
+            self.set_hand_type(self.current_type)
             
     def set_hand_type(self, hand_type: str):
         """Switch between 'left', 'right', and 'none' hand."""
@@ -111,6 +134,11 @@ class HandItem(QGraphicsPixmapItem):
             self.glow_effect.setColor(self.ink_color)
             
     def set_ink_active(self, active: bool):
+        if getattr(self, '_is_drag_mode', False):
+            self.is_ink_active = False
+            self.ink_dot.hide()
+            return
+
         self.is_ink_active = active
         
         effect_type = self._sm.get("ink_effect_type", "dot")

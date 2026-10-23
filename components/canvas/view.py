@@ -12,9 +12,12 @@ class CustomGraphicsView(QGraphicsView):
         if self.viewport():
             self.viewport().setMouseTracking(True)
             
-        # Enable high-quality rendering to prevent pixelation on small screens
+        # Enable high-quality rendering to prevent pixelation on small screens and high-DPI displays
         from PySide6.QtGui import QPainter
-        self.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
+        hints = QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform
+        if hasattr(QPainter.RenderHint, 'LosslessImageRendering'):
+            hints |= QPainter.RenderHint.LosslessImageRendering
+        self.setRenderHints(hints)
         
     def drawForeground(self, painter, rect):
         super().drawForeground(painter, rect)
@@ -231,9 +234,13 @@ class CustomGraphicsView(QGraphicsView):
             from PySide6.QtGui import QPixmap
             path, _ = QFileDialog.getOpenFileName(self, "Replace Image", "", "Images (*.png *.jpg *.jpeg)")
             if path:
-                self._context_item.replace_image(QPixmap(path))
-                self._context_item.filepath = path
-                self.workspace.items_changed.emit(self.workspace.user_items)
+                pix = QPixmap(path)
+                if not pix.isNull():
+                    ok = self._context_item.replace_image(pix)
+                    if ok:
+                        self._context_item.image_path = path
+                        self._context_item.filepath = path
+                        self.workspace.items_changed.emit(self.workspace.user_items)
 
     def _on_context_cut(self):
         if hasattr(self, '_context_item') and self._context_item:

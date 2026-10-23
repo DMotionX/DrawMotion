@@ -5,7 +5,7 @@ Features: Tabs for Object, Animation, and Style properties. Very precise layout 
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, 
                                QLabel, QLineEdit, QSlider, QComboBox, QGridLayout, 
                                QSizePolicy, QScrollArea, QCheckBox, QStackedWidget, QPushButton, QColorDialog)
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QPointF
 from PySide6.QtGui import QFont, QColor
 from utils.theme import THEME_COLORS
 from components.text_editor_panel import TextEditorPanel
@@ -357,6 +357,66 @@ class InspectorPanel(QFrame):
         scroll_layout.setContentsMargins(20, 10, 20, 20)
         scroll_layout.setSpacing(12)
         
+        # Entrance Animation Mode (Draw vs Motion)
+        self.entrance_mode_container = QWidget()
+        entrance_layout = QVBoxLayout(self.entrance_mode_container)
+        entrance_layout.setContentsMargins(0, 0, 0, 0)
+        entrance_layout.addWidget(self._create_section_label("Entrance Animation Mode"))
+        
+        self.entrance_mode_cb = QComboBox()
+        self.entrance_mode_cb.addItem("Draw with Pen", "draw")
+        self.entrance_mode_cb.addItem("Hand Placement & Motion", "motion")
+        self.entrance_mode_cb.currentIndexChanged.connect(self._apply_entrance_mode)
+        entrance_layout.addWidget(self.entrance_mode_cb)
+        scroll_layout.addWidget(self.entrance_mode_container)
+
+        # Motion Engine Settings Container
+        self.motion_engine_container = QWidget()
+        motion_layout = QVBoxLayout(self.motion_engine_container)
+        motion_layout.setContentsMargins(0, 0, 0, 0)
+        motion_layout.setSpacing(10)
+        
+        motion_layout.addWidget(self._create_section_label("Motion Style"))
+        self.motion_style_cb = QComboBox()
+        self.motion_style_cb.addItem("Hand Drag & Place", "hand_drag")
+        self.motion_style_cb.addItem("Directional Slide-In", "slide")
+        self.motion_style_cb.addItem("Elastic Pop & Scale", "elastic_pop")
+        self.motion_style_cb.currentIndexChanged.connect(self._apply_motion_settings)
+        motion_layout.addWidget(self.motion_style_cb)
+        
+        motion_layout.addWidget(self._create_section_label("Entrance Direction"))
+        self.motion_dir_cb = QComboBox()
+        self.motion_dir_cb.addItem("From Left", "left")
+        self.motion_dir_cb.addItem("From Right", "right")
+        self.motion_dir_cb.addItem("From Top", "top")
+        self.motion_dir_cb.addItem("From Bottom", "bottom")
+        self.motion_dir_cb.currentIndexChanged.connect(self._apply_motion_settings)
+        motion_layout.addWidget(self.motion_dir_cb)
+        
+        motion_layout.addWidget(self._create_section_label("Motion Easing"))
+        self.motion_easing_cb = QComboBox()
+        self.motion_easing_cb.addItem("Smooth", "smooth")
+        self.motion_easing_cb.addItem("Elastic Bounce", "elastic")
+        self.motion_easing_cb.addItem("Linear", "linear")
+        self.motion_easing_cb.currentIndexChanged.connect(self._apply_motion_settings)
+        motion_layout.addWidget(self.motion_easing_cb)
+
+        motion_layout.addWidget(self._create_section_label("Motion Speed / Duration"))
+        dur_box = QHBoxLayout()
+        self.motion_dur_slider = QSlider(Qt.Orientation.Horizontal)
+        self.motion_dur_slider.setRange(5, 30)
+        self.motion_dur_slider.setValue(15)
+        self.motion_dur_slider.valueChanged.connect(self._apply_motion_settings)
+        dur_box.addWidget(self.motion_dur_slider)
+        
+        self.motion_dur_lbl = QLabel("1.5s")
+        self.motion_dur_lbl.setStyleSheet(f"color: {THEME_COLORS['text_primary']}; font-size: 11px; min-width: 35px;")
+        dur_box.addWidget(self.motion_dur_lbl)
+        motion_layout.addLayout(dur_box)
+        
+        self.motion_engine_container.hide()
+        scroll_layout.addWidget(self.motion_engine_container)
+
         # Drawing Engine Settings
         self.drawing_engine_container = QWidget()
         drawing_layout = QVBoxLayout(self.drawing_engine_container)
@@ -366,7 +426,8 @@ class InspectorPanel(QFrame):
         self.drawing_style_cb = QComboBox()
         self.drawing_style_cb.addItems([
             "Professional", "Sketch", "Educational", "Solid Reveal", 
-            "Clean Outline", "Organic Sketch", "Hatch Shading", "Line Art (Skeleton)"
+            "Clean Outline", "Organic Sketch", "Hatch Shading", "Line Art (Skeleton)",
+            "Blueprint Drafting", "Engraving Hatch", "Ribbon Flow"
         ])
         self.drawing_style_cb.currentTextChanged.connect(self._apply_drawing_style)
         drawing_layout.addWidget(self.drawing_style_cb)
@@ -375,8 +436,8 @@ class InspectorPanel(QFrame):
         self.drawing_direction_cb = QComboBox()
         self.drawing_direction_cb.addItems([
             "Auto Detect",
-            "Right to Left (Arabic)",
-            "Left to Right (English)"
+            "Right to Left (RTL)",
+            "Left to Right (LTR)"
         ])
         self.drawing_direction_cb.currentTextChanged.connect(self._apply_drawing_direction)
         drawing_layout.addWidget(self.drawing_direction_cb)
@@ -529,6 +590,8 @@ class InspectorPanel(QFrame):
                 self.text_editor.set_node(item)
                 
             # Smart Inspector Visibility (Zero-Risk)
+            self.entrance_mode_container.hide()
+            self.motion_engine_container.hide()
             self.drawing_engine_container.hide()
             self.sfx_container.hide()
             self.physics_algo_container.show()
@@ -547,10 +610,28 @@ class InspectorPanel(QFrame):
                 self.tabs.setCurrentIndex(1)
             
             # Smart Inspector Visibility (Zero-Risk)
-            self.drawing_engine_container.show()
             self.sfx_container.show()
             self.physics_algo_container.hide()
             self.text_effects_container.hide()
+
+            has_entrance = hasattr(item, 'entrance_mode') or hasattr(item, 'motion_settings')
+            if has_entrance:
+                self.entrance_mode_container.show()
+                cur_mode = getattr(item, 'entrance_mode', 'draw')
+                if cur_mode == 'motion':
+                    self.drawing_engine_container.hide()
+                    if hasattr(self, 'library_engine_container'):
+                        self.library_engine_container.hide()
+                    self.motion_engine_container.show()
+                else:
+                    self.drawing_engine_container.show()
+                    if hasattr(self, 'library_engine_container'):
+                        self.library_engine_container.show()
+                    self.motion_engine_container.hide()
+            else:
+                self.entrance_mode_container.hide()
+                self.motion_engine_container.hide()
+                self.drawing_engine_container.show()
             
         # Handle live binding signals
         if hasattr(self, '_current_connected_item') and self._current_connected_item:
@@ -576,6 +657,11 @@ class InspectorPanel(QFrame):
         self.opacity_slider.blockSignals(True)
         self.dur_in.blockSignals(True)
         self.del_in.blockSignals(True)
+        self.entrance_mode_cb.blockSignals(True)
+        self.motion_style_cb.blockSignals(True)
+        self.motion_dir_cb.blockSignals(True)
+        self.motion_easing_cb.blockSignals(True)
+        self.motion_dur_slider.blockSignals(True)
         self.drawing_style_cb.blockSignals(True)
         if hasattr(self, 'drawing_direction_cb'):
             self.drawing_direction_cb.blockSignals(True)
@@ -666,8 +752,8 @@ class InspectorPanel(QFrame):
         if hasattr(item, 'drawing_direction'):
             dir_map = {
                 "auto": "Auto Detect",
-                "rtl": "Right to Left (Arabic)",
-                "ltr": "Left to Right (English)"
+                "rtl": "Right to Left (RTL)",
+                "ltr": "Left to Right (LTR)"
             }
             cur_dir = getattr(item, 'drawing_direction', 'auto')
             if hasattr(self, 'drawing_direction_cb'):
@@ -694,7 +780,41 @@ class InspectorPanel(QFrame):
         else:
             self.effect_combo.setEnabled(False)
             
+        # Update Entrance & Motion fields
+        if hasattr(item, 'entrance_mode'):
+            idx = self.entrance_mode_cb.findData(item.entrance_mode)
+            if idx >= 0:
+                self.entrance_mode_cb.setCurrentIndex(idx)
+            else:
+                self.entrance_mode_cb.setCurrentIndex(0)
+                
+        if hasattr(item, 'motion_settings'):
+            m_settings = getattr(item, 'motion_settings', {}) or {}
+            m_style = m_settings.get("style", "hand_drag")
+            m_dir = m_settings.get("direction", "left")
+            m_easing = m_settings.get("easing", "smooth")
+            m_dur = float(m_settings.get("duration", 1.5))
+            
+            idx = self.motion_style_cb.findData(m_style)
+            if idx >= 0: self.motion_style_cb.setCurrentIndex(idx)
+            
+            idx = self.motion_dir_cb.findData(m_dir)
+            if idx >= 0: self.motion_dir_cb.setCurrentIndex(idx)
+            
+            idx = self.motion_easing_cb.findData(m_easing)
+            if idx >= 0: self.motion_easing_cb.setCurrentIndex(idx)
+            
+            slider_val = int(round(m_dur * 10))
+            self.motion_dur_slider.setValue(max(5, min(30, slider_val)))
+            self.motion_dur_lbl.setText(f"{m_dur:.1f}s")
+            self.motion_dir_cb.setEnabled(m_style != "elastic_pop")
+
         # Unblock combo signals
+        self.entrance_mode_cb.blockSignals(False)
+        self.motion_style_cb.blockSignals(False)
+        self.motion_dir_cb.blockSignals(False)
+        self.motion_easing_cb.blockSignals(False)
+        self.motion_dur_slider.blockSignals(False)
         self.drawing_style_cb.blockSignals(False)
         if hasattr(self, 'drawing_direction_cb'):
             self.drawing_direction_cb.blockSignals(False)
@@ -708,9 +828,49 @@ class InspectorPanel(QFrame):
         self._ensure_active_tab_scrolled_to_top()
         QTimer.singleShot(0, self._ensure_active_tab_scrolled_to_top)
             
+    def _apply_entrance_mode(self, index):
+        if not self.current_item: return
+        mode = self.entrance_mode_cb.currentData() or "draw"
+        self.current_item.entrance_mode = mode
+        
+        if mode == "motion":
+            self.drawing_engine_container.hide()
+            if hasattr(self, 'library_engine_container'):
+                self.library_engine_container.hide()
+            self.motion_engine_container.show()
+            style = self.motion_style_cb.currentData() or "hand_drag"
+            self.motion_dir_cb.setEnabled(style != "elastic_pop")
+        else:
+            self.drawing_engine_container.show()
+            if hasattr(self, 'library_engine_container'):
+                self.library_engine_container.show()
+            self.motion_engine_container.hide()
+            
+        self.item_modified.emit()
+
+    def _apply_motion_settings(self, *args):
+        if not self.current_item: return
+        style = self.motion_style_cb.currentData() or "hand_drag"
+        direction = self.motion_dir_cb.currentData() or "left"
+        easing = self.motion_easing_cb.currentData() or "smooth"
+        dur_sec = round(self.motion_dur_slider.value() / 10.0, 1)
+        self.motion_dur_lbl.setText(f"{dur_sec}s")
+        
+        self.motion_dir_cb.setEnabled(style != "elastic_pop")
+        
+        self.current_item.motion_settings = {
+            "style": style,
+            "direction": direction,
+            "duration": dur_sec,
+            "easing": easing
+        }
+        self.item_modified.emit()
+            
             
     def _apply_drawing_style(self, text):
         if not self.current_item or not hasattr(self.current_item, 'set_drawing_style'): return
+        if getattr(self.current_item, 'drawing_style', None) == text:
+            return
         cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
         self.current_item.set_drawing_style(text)
         
@@ -725,13 +885,16 @@ class InspectorPanel(QFrame):
 
     def _apply_drawing_direction(self, text):
         if not self.current_item or not hasattr(self.current_item, 'set_drawing_direction'): return
-        cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
         val_map = {
             "Auto Detect": "auto",
-            "Right to Left (Arabic)": "rtl",
-            "Left to Right (English)": "ltr"
+            "Right to Left (RTL)": "rtl",
+            "Left to Right (LTR)": "ltr"
         }
-        self.current_item.set_drawing_direction(val_map.get(text, "auto"))
+        new_dir = val_map.get(text, "auto")
+        if getattr(self.current_item, 'drawing_direction', None) == new_dir:
+            return
+        cur_scroll = self.style_scroll_area.verticalScrollBar().value() if hasattr(self, 'style_scroll_area') and self.style_scroll_area else 0
+        self.current_item.set_drawing_direction(new_dir)
         self.item_modified.emit()
         if hasattr(self, 'style_scroll_area') and self.style_scroll_area:
             self.style_scroll_area.verticalScrollBar().setValue(cur_scroll)
@@ -792,6 +955,12 @@ class InspectorPanel(QFrame):
             
             r = float(r_txt or 0)
             self.current_item.setRotation(r)
+            
+            # Sync target transform for motion engine
+            self.current_item._motion_target_pos = QPointF(x, y)
+            self.current_item._motion_target_scale = float(s)
+            self.current_item._motion_target_rotation = float(r)
+            
             self.item_modified.emit()
         except ValueError:
             pass
@@ -801,6 +970,7 @@ class InspectorPanel(QFrame):
         val = self.opacity_slider.value()
         self.op_val.setText(f"{val}%")
         self.current_item.setOpacity(val / 100.0)
+        self.current_item._motion_target_opacity = val / 100.0
         self.item_modified.emit()
 
     def update_ui_from_item(self):
