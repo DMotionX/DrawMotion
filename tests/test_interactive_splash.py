@@ -49,7 +49,7 @@ def test_interactive_splash_finish_smoothly(qapp, qtbot):
     splash.show()
 
     splash.finish_smoothly(dummy_window)
-    # Wait for the 250ms animation and deletion to complete
-    qtbot.wait(350)
+    # Wait for the transition to complete and target window to become visible
+    qtbot.waitUntil(lambda: dummy_window.isVisible(), timeout=1000)
     assert dummy_window.isVisible()
     dummy_window.close()
