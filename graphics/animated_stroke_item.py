@@ -16,9 +16,16 @@ class AnimatedStrokeItem(QGraphicsPathItem):
         self._progress = 2.0 # 0.0 to 1.0 (Stroke), 1.0 to 2.0 (Fill) - Default to fully visible
         self._fill_progress = 1.0 
         
-        # Custom Animation Properties
         self.anim_duration = 2.0 # seconds
         self.anim_delay = 0.0 # seconds
+        self.entrance_mode = "draw"
+        self.motion_settings = {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        }
         self.sfx_name = "None"
         self.sfx_volume = 100
         
@@ -149,6 +156,10 @@ class AnimatedStrokeItem(QGraphicsPathItem):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+        self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+        self._motion_target_scale = float(self.scale())
+        self._motion_target_rotation = float(self.rotation())
+        self._motion_target_opacity = float(self.opacity())
             
     def to_dict(self):
         from core.serialization.serializer import SerializerEngine
@@ -167,6 +178,14 @@ class AnimatedStrokeItem(QGraphicsPathItem):
             "width": self.base_pen.width(),
             "sfx_name": getattr(self, "sfx_name", "None"),
             "sfx_volume": getattr(self, "sfx_volume", 100),
+            "entrance_mode": getattr(self, "entrance_mode", "draw"),
+            "motion_settings": getattr(self, "motion_settings", {
+                "style": "hand_drag",
+                "direction": "left",
+                "duration": 1.5,
+                "easing": "smooth",
+                "sfx": "none"
+            }),
             "path_elements": SerializerEngine.serialize_path(self.path())
         }
         
@@ -187,6 +206,18 @@ class AnimatedStrokeItem(QGraphicsPathItem):
         item.anim_duration = data.get("anim_duration", 2.0)
         item.anim_delay = data.get("anim_delay", 0.0)
         item._layer_name = data.get("layer_name", "Stroke")
+        item.entrance_mode = data.get("entrance_mode", "draw")
+        item.motion_settings = data.get("motion_settings", {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        })
         item.sfx_name = data.get("sfx_name", "None")
         item.sfx_volume = data.get("sfx_volume", 100)
+        item._motion_target_pos = QPointF(item.pos().x(), item.pos().y())
+        item._motion_target_scale = float(item.scale())
+        item._motion_target_rotation = float(item.rotation())
+        item._motion_target_opacity = float(item.opacity())
         return item

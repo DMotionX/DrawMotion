@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QComboBox, QSlider, QWidget, QHBoxLayout, QLabel
 from PySide6.QtCore import Qt
 from .project_settings import SettingsSection
+from components.write_to_image.hand_catalog import WritingHandCatalog
 
 class DrawingSettings(SettingsSection):
     def __init__(self, parent=None):
@@ -94,4 +95,102 @@ class DrawingSettings(SettingsSection):
         
         self.add_row(card, "Drawing Sound Volume:", sfx_vol_container)
 
+        # ── Dedicated Handwriting Preferences Card (Write Engine) ───────────
+        writing_card = self.begin_card("Handwriting Preferences (Write Engine)")
+
+        # 1. Hand Direction (Right / Left)
+        self.writing_hand_type_combo = QComboBox()
+        self.writing_hand_type_combo.addItems(["Right Hand", "Left Hand"])
+        _hand_type_keys = ["right", "left"]
+        curr_ht = self.settings.get("writing_hand_type", "right")
+        ht_idx = _hand_type_keys.index(curr_ht) if curr_ht in _hand_type_keys else 0
+        self.writing_hand_type_combo.setCurrentIndex(ht_idx)
+
+        # 2. Writing Pen Model & Style
+        self.writing_style_combo = QComboBox()
+
+        def refresh_writing_styles(hand_type_val: str):
+            self.writing_style_combo.blockSignals(True)
+            self.writing_style_combo.clear()
+            available = WritingHandCatalog.get_available_styles(hand_type_val)
+            for sid, sname in available:
+                self.writing_style_combo.addItem(sname, sid)
+
+            curr_sid = self.settings.get("writing_hand_style", "default")
+            idx = self.writing_style_combo.findData(curr_sid)
+            if idx < 0:
+                idx = 0
+            self.writing_style_combo.setCurrentIndex(idx)
+            self.writing_style_combo.blockSignals(False)
+
+        refresh_writing_styles(curr_ht)
+
+        def on_writing_hand_type_changed(i: int):
+            new_type = _hand_type_keys[i]
+            self.settings.set("writing_hand_type", new_type)
+            refresh_writing_styles(new_type)
+
+        def on_writing_style_changed(i: int):
+            new_sid = self.writing_style_combo.currentData()
+            if new_sid:
+                self.settings.set("writing_hand_style", new_sid)
+
+        self.writing_hand_type_combo.currentIndexChanged.connect(on_writing_hand_type_changed)
+        self.writing_style_combo.currentIndexChanged.connect(on_writing_style_changed)
+
+        self.add_row(writing_card, "Writing Hand:", self.writing_hand_type_combo)
+        self.add_row(writing_card, "Pen Model & Style:", self.writing_style_combo)
+
+        # 3. Writing Hand Size Slider (0.5x to 2.0x)
+        writing_size_container = QWidget()
+        writing_size_layout = QHBoxLayout(writing_size_container)
+        writing_size_layout.setContentsMargins(0, 0, 0, 0)
+        writing_size_layout.setSpacing(12)
+
+        self.writing_size_slider = QSlider(Qt.Orientation.Horizontal)
+        self.writing_size_slider.setRange(5, 20)  # 0.5x to 2.0x
+        self.writing_size_slider.setFixedWidth(220)
+        curr_size = float(self.settings.get("writing_hand_size", 1.0))
+        self.writing_size_slider.setValue(int(round(curr_size * 10)))
+
+        self.writing_size_lbl = QLabel(f"{curr_size:.1f}x")
+        self.writing_size_lbl.setStyleSheet("color: #3CB371; font-weight: 600; min-width: 45px;")
+
+        def on_writing_size_changed(val: int):
+            fval = val / 10.0
+            self.settings.set("writing_hand_size", fval)
+            self.writing_size_lbl.setText(f"{fval:.1f}x")
+
+        self.writing_size_slider.valueChanged.connect(on_writing_size_changed)
+        writing_size_layout.addWidget(self.writing_size_slider)
+        writing_size_layout.addWidget(self.writing_size_lbl)
+
+        self.add_row(writing_card, "Writing Hand Size:", writing_size_container)
+
+        # 4. Handwriting Kinematics Dynamics
+        self.writing_algo_combo = QComboBox()
+        algo_options = [
+            ("Realistic Hybrid (Two-Thirds + Min-Jerk)", "realistic_hybrid"),
+            ("Minimum-Jerk Velocity Envelope", "minimum_jerk"),
+            ("Two-Thirds Power Law Curvature", "two_thirds_power_law"),
+            ("Linear Uniform Timing", "linear"),
+        ]
+        for label, val in algo_options:
+            self.writing_algo_combo.addItem(label, val)
+
+        curr_algo = self.settings.get("writing_algorithm", "realistic_hybrid")
+        algo_idx = self.writing_algo_combo.findData(curr_algo)
+        if algo_idx < 0:
+            algo_idx = 0
+        self.writing_algo_combo.setCurrentIndex(algo_idx)
+
+        def on_writing_algo_changed(i: int):
+            algo_val = self.writing_algo_combo.currentData()
+            if algo_val:
+                self.settings.set("writing_algorithm", algo_val)
+
+        self.writing_algo_combo.currentIndexChanged.connect(on_writing_algo_changed)
+        self.add_row(writing_card, "Handwriting Dynamics:", self.writing_algo_combo)
+
         self.layout.addStretch()
+

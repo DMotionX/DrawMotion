@@ -3,18 +3,36 @@ from PySide6.QtCore import Qt, QPoint, QRect
 from PySide6.QtWidgets import QGraphicsDropShadowEffect, QGraphicsScene, QGraphicsPixmapItem
 from PySide6.QtGui import QPixmap
 
+def _create_tinted_image(src: QImage, color: QColor) -> QImage:
+    """Creates a tinted clone of src preserving its exact alpha mask."""
+    tinted = QImage(src.size(), QImage.Format.Format_ARGB32_Premultiplied)
+    tinted.fill(Qt.GlobalColor.transparent)
+    p = QPainter(tinted)
+    p.drawImage(0, 0, src)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(tinted.rect(), color)
+    p.end()
+    return tinted
+
+
 def apply_glow_effect(img: QImage, color_hex: str) -> QImage:
-    # Uses a QGraphicsDropShadowEffect to create a glow
+    """Soft, radiant outer luminescence that preserves 100% crisp foreground text."""
+    base_color = QColor(color_hex)
+    if base_color.lightnessF() < 0.25:
+        glow_color = QColor("#00B4D8")
+    else:
+        glow_color = QColor(base_color)
+    glow_color.setAlpha(150)
+
     scene = QGraphicsScene()
     pixmap = QPixmap.fromImage(img)
     item = QGraphicsPixmapItem(pixmap)
     
     glow = QGraphicsDropShadowEffect()
-    glow.setBlurRadius(30)
-    glow.setColor(QColor(color_hex))
+    glow.setBlurRadius(20)
+    glow.setColor(glow_color)
     glow.setOffset(0, 0)
     item.setGraphicsEffect(glow)
-    
     scene.addItem(item)
     
     res = QImage(img.size(), QImage.Format.Format_ARGB32_Premultiplied)
@@ -23,36 +41,41 @@ def apply_glow_effect(img: QImage, color_hex: str) -> QImage:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     scene.render(painter)
-    painter.end()
     
-    # We must also draw the original text over the glow so it stays sharp
-    painter = QPainter(res)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    # Always composite the original text on top with 100% opacity for tack-sharp letterforms
     painter.drawImage(0, 0, img)
     painter.end()
-    
     return res
 
+
 def apply_neon_effect(img: QImage, color_hex: str) -> QImage:
-    # Multiple layered drop shadows for a intense neon look
+    """Dual-pass neon glow: soft aura + focused halo, compositing sharp text on top."""
+    base_color = QColor(color_hex)
+    if base_color.lightnessF() < 0.25:
+        neon_color = QColor("#00F0FF")
+    else:
+        neon_color = QColor(base_color)
+
     scene = QGraphicsScene()
     pixmap = QPixmap.fromImage(img)
     
-    # Base glow
+    # Pass 1: Soft outer aura
     item1 = QGraphicsPixmapItem(pixmap)
     glow1 = QGraphicsDropShadowEffect()
-    glow1.setBlurRadius(50)
-    glow1.setColor(QColor(color_hex))
+    glow1.setBlurRadius(24)
+    c1 = QColor(neon_color)
+    c1.setAlpha(130)
+    glow1.setColor(c1)
     glow1.setOffset(0, 0)
     item1.setGraphicsEffect(glow1)
     scene.addItem(item1)
     
-    # Inner intense glow (white-ish)
+    # Pass 2: Focused inner neon core
     item2 = QGraphicsPixmapItem(pixmap)
     glow2 = QGraphicsDropShadowEffect()
-    glow2.setBlurRadius(15)
-    c2 = QColor(color_hex).lighter(150)
+    glow2.setBlurRadius(8)
+    c2 = QColor(neon_color).lighter(120)
+    c2.setAlpha(180)
     glow2.setColor(c2)
     glow2.setOffset(0, 0)
     item2.setGraphicsEffect(glow2)
@@ -64,20 +87,23 @@ def apply_neon_effect(img: QImage, color_hex: str) -> QImage:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     scene.render(painter)
-    painter.end()
     
+    # Composite original crisp text on top to eliminate eye-straining blur or washout
+    painter.drawImage(0, 0, img)
+    painter.end()
     return res
 
+
 def apply_ink_bleed_effect(img: QImage) -> QImage:
-    # A simple pseudo ink-bleed by slightly blurring and layering
+    """Realistic paper ink absorption & subtle bleed."""
     scene = QGraphicsScene()
     pixmap = QPixmap.fromImage(img)
     
     item = QGraphicsPixmapItem(pixmap)
     bleed = QGraphicsDropShadowEffect()
-    bleed.setBlurRadius(8)
-    bleed.setColor(QColor(0, 0, 0, 150)) # Dark bleed
-    bleed.setOffset(2, 2)
+    bleed.setBlurRadius(6)
+    bleed.setColor(QColor(0, 0, 0, 130))
+    bleed.setOffset(1, 1)
     item.setGraphicsEffect(bleed)
     scene.addItem(item)
     
@@ -87,25 +113,22 @@ def apply_ink_bleed_effect(img: QImage) -> QImage:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     scene.render(painter)
-    painter.end()
     
-    painter = QPainter(res)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     painter.drawImage(0, 0, img)
     painter.end()
-    
     return res
 
+
 def apply_drop_shadow_effect(img: QImage) -> QImage:
+    """Soft directional drop shadow."""
     scene = QGraphicsScene()
     pixmap = QPixmap.fromImage(img)
     item = QGraphicsPixmapItem(pixmap)
     
     shadow = QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(15)
-    shadow.setColor(QColor(0, 0, 0, 180))
-    shadow.setOffset(5, 5)
+    shadow.setBlurRadius(14)
+    shadow.setColor(QColor(0, 0, 0, 160))
+    shadow.setOffset(4, 4)
     item.setGraphicsEffect(shadow)
     scene.addItem(item)
     
@@ -115,51 +138,50 @@ def apply_drop_shadow_effect(img: QImage) -> QImage:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     scene.render(painter)
+    painter.drawImage(0, 0, img)
     painter.end()
-    
     return res
 
+
 def apply_glitch_effect(img: QImage) -> QImage:
-    # Simulates a chromatic aberration / glitch effect by shifting red and blue channels
+    """True RGB chromatic aberration with cyan/magenta channel offsets and sharp center."""
+    cyan_fringe = _create_tinted_image(img, QColor(0, 230, 255, 180))
+    magenta_fringe = _create_tinted_image(img, QColor(255, 30, 80, 180))
+    
     res = QImage(img.size(), QImage.Format.Format_ARGB32_Premultiplied)
     res.fill(Qt.GlobalColor.transparent)
     
     painter = QPainter(res)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    painter.setCompositionMode(QPainter.CompositionMode_Screen)
     
-    # Red Shift
-    painter.setOpacity(0.7)
-    painter.drawImage(4, 0, img)
-    # Blue Shift
-    painter.drawImage(-4, 0, img)
-    # Original
-    painter.setOpacity(1.0)
-    painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+    # Cyan shifted left, Magenta shifted right
+    painter.drawImage(-3, 0, cyan_fringe)
+    painter.drawImage(3, 0, magenta_fringe)
+    # Original text centered on top
     painter.drawImage(0, 0, img)
     painter.end()
-    
     return res
 
+
 def apply_holographic_effect(img: QImage, color_hex: str) -> QImage:
-    # A cyan/magenta glow with a slight transparency
+    """Dual cyan and magenta chromatic radiance with crisp foreground text."""
     scene = QGraphicsScene()
     pixmap = QPixmap.fromImage(img)
     
-    item = QGraphicsPixmapItem(pixmap)
-    glow = QGraphicsDropShadowEffect()
-    glow.setBlurRadius(20)
-    glow.setColor(QColor(0, 255, 255, 150)) # Cyan
-    glow.setOffset(-3, 0)
-    item.setGraphicsEffect(glow)
-    scene.addItem(item)
+    item1 = QGraphicsPixmapItem(pixmap)
+    glow1 = QGraphicsDropShadowEffect()
+    glow1.setBlurRadius(16)
+    glow1.setColor(QColor(0, 255, 255, 140))
+    glow1.setOffset(-2, 0)
+    item1.setGraphicsEffect(glow1)
+    scene.addItem(item1)
     
     item2 = QGraphicsPixmapItem(pixmap)
     glow2 = QGraphicsDropShadowEffect()
-    glow2.setBlurRadius(20)
-    glow2.setColor(QColor(255, 0, 255, 150)) # Magenta
-    glow2.setOffset(3, 0)
+    glow2.setBlurRadius(16)
+    glow2.setColor(QColor(255, 0, 255, 140))
+    glow2.setOffset(2, 0)
     item2.setGraphicsEffect(glow2)
     scene.addItem(item2)
     
@@ -169,16 +191,10 @@ def apply_holographic_effect(img: QImage, color_hex: str) -> QImage:
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     scene.render(painter)
-    painter.end()
     
-    # Draw original text slightly transparent
-    painter = QPainter(res)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    painter.setOpacity(0.85)
+    # Draw original text with crisp definition
     painter.drawImage(0, 0, img)
     painter.end()
-    
     return res
 
 def apply_text_effect(img: QImage, effect_type: str, color_hex: str) -> QImage:
@@ -198,3 +214,15 @@ def apply_text_effect(img: QImage, effect_type: str, color_hex: str) -> QImage:
     elif effect_type == "holographic":
         return apply_holographic_effect(img, color_hex)
     return img
+
+
+AVAILABLE_EFFECTS = [
+    {"id": "none", "name": "None", "description": "Original clean render"},
+    {"id": "glow", "name": "Glow", "description": "Soft radiant outer luminescence"},
+    {"id": "neon", "name": "Neon", "description": "High-intensity double-pass neon glow"},
+    {"id": "ink_bleed", "name": "Ink Bleed", "description": "Realistic paper ink absorption & slight bleed"},
+    {"id": "drop_shadow", "name": "Drop Shadow", "description": "Soft cinematic directional shadow"},
+    {"id": "glitch", "name": "Glitch", "description": "Chromatic RGB aberration offset"},
+    {"id": "holographic", "name": "Holographic", "description": "Dual cyan and magenta chromatic radiance"},
+]
+

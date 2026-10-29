@@ -77,6 +77,8 @@ jobs:
             --include-package=models \
             --include-data-dir="resources=resources" \
             --include-data-dir="assets=assets" \
+            --include-data-dir="components/project_hub/qml=components/project_hub/qml" \
+            --include-data-dir="components/write_to_image/effects/qml=components/write_to_image/effects/qml" \
             --nofollow-import-to=scipy \
             --output-dir="dist" \
             --output-filename="DrawMotion" \

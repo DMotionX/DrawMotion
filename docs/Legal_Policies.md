@@ -4,7 +4,7 @@
 **Official Team Email:** [easysoft.dv2team@gmail.com](mailto:easysoft.dv2team@gmail.com)  
 **Official Portal:** [https://drawmotion-web.vercel.app/](https://drawmotion-web.vercel.app/)  
 **Official Repository:** [https://github.com/DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)  
-**Official Facebook Page:** [https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR](https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR)
+**Official Facebook Page:** [https://www.facebook.com/profile.php?id=61595676097302](https://www.facebook.com/profile.php?id=61595676097302)
 
 Welcome to DrawMotion! These policies define the terms of use, software license, privacy practices, and third-party notices. By downloading, installing, or using DrawMotion, you agree to be bound by this agreement.
 
@@ -12,10 +12,10 @@ Welcome to DrawMotion! These policies define the terms of use, software license,
 
 ## 1. Mission, Identity & Ownership
 
-### 1.1 Founder & The EASY SOFT TEAM
-DrawMotion is conceived, engineered, and maintained by **Mohamed Fadl** as Founder and Lead Developer. Core algorithms, rendering logic, and interface architecture are developed by Mohamed Fadl, with community contributions and feedback from testing teams under the banner of **EASY SOFT TEAM**.
+### 1.1 Founder & The DrawMotion Team
+DrawMotion is conceived, engineered, and maintained by **Mohamed Fadl** as Founder and Lead Developer. Core algorithms, rendering logic, and interface architecture are developed by Mohamed Fadl, with community contributions and feedback from testing teams under the banner of **DrawMotion Team**.
 
-**EASY SOFT TEAM** is an independent, non-profit software initiative dedicated to building free, high-performance, local-first creative tools.
+**DrawMotion Team** is an independent, non-profit software initiative dedicated to building free, high-performance, local-first creative tools.
 
 ### 1.2 Anti-Monopoly Vision & Zero Financial Backing
 DrawMotion operates entirely through self-funded effort with zero corporate funding or venture backing. Our guiding vision is to challenge digital software monopolies by making professional animation and drawing software freely accessible to every creator worldwide, without subscriptions or artificial paywalls.
@@ -36,7 +36,7 @@ You are free to inspect, study, fork, modify, and contribute to DrawMotion in ac
 
 ### 2.3 Software Integrity & Responsible Distribution
 While the source code is free and open under GPLv3, to protect users from malicious tampering or modified adware clones:
-- Official binaries and installers bearing the **DrawMotion** brand name and icons are officially built and released exclusively by **Mohamed Fadl** and the **EASY SOFT TEAM**.
+- Official binaries and installers bearing the **DrawMotion** brand name and icons are officially built and released exclusively by **Mohamed Fadl** and the **DrawMotion Team**.
 - You may not repackage DrawMotion into third-party adware bundles, malware wrappers, or deceptive commercial installers.
 - You may not offer DrawMotion as a deceptive paid subscription without clear notice of its free, open-source nature.
 
@@ -47,7 +47,7 @@ DrawMotion gratefully utilizes high-quality open-source frameworks:
 - **Python Runtime & Standard Wheels:** Distributed under standard Python Software Foundation and permissive open-source licenses.
 
 ### 2.5 Code Signing & Antivirus Transparency
-DrawMotion binaries are signed with a private self-signed certificate under **EASY SOFT TEAM**, rather than an expensive commercial Microsoft-vetted certificate authority. Consequently:
+DrawMotion binaries are signed with a private self-signed certificate under **DrawMotion Team**, rather than an expensive commercial Microsoft-vetted certificate authority. Consequently:
 - Windows SmartScreen or certain antivirus products may display an "Unknown Publisher" or unverified application prompt upon first launch.
 - Every release is verified through automated scanning tooling and VirusTotal prior to distribution.
 - Verifiable **SHA-256 checksums** are published alongside every official release so you can independently verify installer authenticity.
@@ -57,10 +57,10 @@ DrawMotion binaries are signed with a private self-signed certificate under **EA
 DrawMotion is in an active **Beta Development Phase**. While engineered for speed and stability, unforeseen edge cases or bugs may occur. Users are strongly advised to maintain regular backups of their project files and exported assets.
 
 ### 2.7 Disclaimer of Warranty
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR (MOHAMED FADL) AND EASY SOFT TEAM MAKE NO REPRESENTATION OR WARRANTY THAT THE SOFTWARE WILL OPERATE UNINTERRUPTED, ERROR-FREE, OR SECURE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR (MOHAMED FADL) AND DRAWMOTION TEAM MAKE NO REPRESENTATION OR WARRANTY THAT THE SOFTWARE WILL OPERATE UNINTERRUPTED, ERROR-FREE, OR SECURE.
 
 ### 2.8 Limitation of Liability
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE AUTHOR (MOHAMED FADL) OR EASY SOFT TEAM BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES (INCLUDING LOSS OF DATA, LOSS OF PROFITS, BUSINESS INTERRUPTION, OR SYSTEM CORRUPTION) ARISING OUT OF OR IN CONNECTION WITH THE USE OR INABILITY TO USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE AUTHOR (MOHAMED FADL) OR DRAWMOTION TEAM BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES (INCLUDING LOSS OF DATA, LOSS OF PROFITS, BUSINESS INTERRUPTION, OR SYSTEM CORRUPTION) ARISING OUT OF OR IN CONNECTION WITH THE USE OR INABILITY TO USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
 ### 2.9 Governing Law & Severability
 This agreement shall be governed by and construed in accordance with the laws of the **Arab Republic of Egypt**, without regard to conflict of law principles. If any provision of this agreement is held by a competent court to be invalid or unenforceable, that provision shall be enforced to the maximum extent permissible, and the remaining provisions shall remain in full force and effect.
@@ -93,10 +93,10 @@ Our companion web presence ([https://drawmotion-web.vercel.app/](https://drawmot
 
 ## 4. Copyright & Inquiries
 
-**Copyright © 2026 Mohamed Fadl (EASY SOFT TEAM). All rights reserved.**
+**Copyright © 2026 Mohamed Fadl (DrawMotion Team). All rights reserved.**
 
 For legal questions, bug reports, or partnership inquiries:  
 - **Email:** [easysoft.dv2team@gmail.com](mailto:easysoft.dv2team@gmail.com)  
-- **Facebook:** [https://www.facebook.com/profile.php?id=61592234934862](https://www.facebook.com/profile.php?id=61592234934862)  
+- **Facebook:** [https://www.facebook.com/profile.php?id=61595676097302](https://www.facebook.com/profile.php?id=61595676097302)  
 - **GitHub:** [https://github.com/DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)  
 - **Developer on X:** [https://x.com/MohamedFad19757](https://x.com/MohamedFad19757)

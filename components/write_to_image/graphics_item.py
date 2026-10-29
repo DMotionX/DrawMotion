@@ -49,6 +49,14 @@ class WriteToImageGraphicsItem(QGraphicsObject):
         self.drawing_style = "Solid Reveal"
         self._anim_delay = 0.0
         self._layer_name = "default"
+        self.entrance_mode = "draw"
+        self.motion_settings = {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        }
         print(f"[GraphicsItem LOG] Init. Text: '{self.model.text[:10]}...', Duration set to: {self._anim_duration}s (Model Duration: {getattr(self.model, 'duration', None)})")
         
         # Animation properties
@@ -97,8 +105,19 @@ class WriteToImageGraphicsItem(QGraphicsObject):
                     pass
                     
             # Generate Time Map for smooth human-like reveal using the clean base image!
-            self._time_map = generate_time_map(self._original_image, self.is_rtl, char_map)
-            self._generate_trajectory()
+            algo_name = getattr(self.model, 'writing_algorithm', None) or getattr(self.model, 'algorithm_style', 'realistic_hybrid')
+            res = generate_time_map(
+                self._original_image, 
+                self.is_rtl, 
+                char_map=char_map, 
+                algorithm=algo_name, 
+                return_trajectory=True
+            )
+            if isinstance(res, tuple):
+                self._time_map, self._trajectory = res
+            else:
+                self._time_map = res
+                self._generate_trajectory()
             
             # Auto-upgrade old models that had scale_w = 0.2 due to previous hack
             if getattr(self.model, 'scale_w', 1.0) == 0.2:
@@ -110,6 +129,8 @@ class WriteToImageGraphicsItem(QGraphicsObject):
                 self.model.scale_w = 1.0
                 self.model.scale_h = 1.0
                 self.setScale(1.0)
+            else:
+                self.setScale(self.model.scale_w)
                 
             self.prepareGeometryChange()
             self.update()
@@ -117,6 +138,8 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             self._pixmap = None
 
     def _generate_trajectory(self):
+        if hasattr(self, '_trajectory') and self._trajectory and len(self._trajectory) == 256:
+            return
         self._trajectory = []
         if not hasattr(self, '_time_map') or self._time_map is None:
             return
@@ -175,12 +198,24 @@ class WriteToImageGraphicsItem(QGraphicsObject):
         if not hasattr(self, '_trajectory') or not self._trajectory or self.progress <= 0:
             return self.boundingRect().center()
             
-        idx = int(self.progress * 255)
-        idx = min(max(idx, 0), 255)
-        
-        dpr = self._pixmap.devicePixelRatio()
-        pt = self._trajectory[idx]
-        return QPointF(pt.x() / dpr, pt.y() / dpr)
+        traj_len = len(self._trajectory)
+        dpr = self._pixmap.devicePixelRatio() if getattr(self, '_pixmap', None) else 1.0
+        if traj_len == 1:
+            pt = self._trajectory[0]
+            return QPointF(pt.x() / dpr, pt.y() / dpr)
+
+        # Continuous sub-pixel floating-point interpolation between trajectory sample points
+        t_float = self.progress * (traj_len - 1)
+        i0 = int(t_float)
+        i1 = min(i0 + 1, traj_len - 1)
+        frac = t_float - i0
+
+        p0 = self._trajectory[i0]
+        p1 = self._trajectory[i1]
+        x = p0.x() * (1.0 - frac) + p1.x() * frac
+        y = p0.y() * (1.0 - frac) + p1.y() * frac
+
+        return QPointF(x / dpr, y / dpr)
 
     def get_tip_position(self) -> QPointF:
         return self._get_exact_target()
@@ -244,6 +279,7 @@ class WriteToImageGraphicsItem(QGraphicsObject):
         if p <= 0:
             return
             
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         
         if p >= 1.0 or getattr(self, '_time_map', None) is None:
@@ -257,19 +293,23 @@ class WriteToImageGraphicsItem(QGraphicsObject):
         
         h, w = mask.shape
         mask_bytes = mask.tobytes()
-        mask_qimage = QImage(mask_bytes, w, h, w, QImage.Format_Alpha8)
-        mask_qimage.setDevicePixelRatio(self._pixmap.devicePixelRatio())
+        dpr = self._pixmap.devicePixelRatio()
+        mask_qimage = QImage(mask_bytes, w, h, w, QImage.Format.Format_Alpha8)
+        mask_qimage.setDevicePixelRatio(dpr)
         
-        temp_img = QImage(self._pixmap.size(), QImage.Format_ARGB32_Premultiplied)
-        temp_img.fill(Qt.transparent)
-        temp_img.setDevicePixelRatio(self._pixmap.devicePixelRatio())
+        # High-DPI buffer preservation: use actual physical pixel dimensions (toImage().size())
+        # to prevent 25x pixel loss and blurriness!
+        full_size = self._pixmap.toImage().size()
+        temp_img = QImage(full_size, QImage.Format.Format_ARGB32_Premultiplied)
+        temp_img.fill(Qt.GlobalColor.transparent)
+        temp_img.setDevicePixelRatio(dpr)
         
         p2 = QPainter(temp_img)
         p2.setRenderHint(QPainter.RenderHint.Antialiasing)
         p2.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         # Draw the display image (with effects)
         p2.drawImage(0, 0, self._pixmap.toImage())
-        p2.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+        p2.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
         p2.drawImage(0, 0, mask_qimage)
         p2.end()
         
@@ -383,7 +423,7 @@ class WriteToImageGraphicsItem(QGraphicsObject):
                 self.setCursor(Qt.CursorShape.OpenHandCursor)
                 self._hover_handle = None
         else:
-            # Deep inside image -> Move/Grab zone ("المقبض")
+            # Deep inside image -> Move/Grab zone (grip)
             self.setCursor(Qt.CursorShape.OpenHandCursor)
             self._hover_handle = None
 
@@ -485,6 +525,10 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             super().mouseReleaseEvent(event)
         if not getattr(self, "_hover_handle", None):
             self.setCursor(Qt.CursorShape.OpenHandCursor)
+        self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+        self._motion_target_scale = float(self.scale())
+        self._motion_target_rotation = float(self.rotation())
+        self._motion_target_opacity = float(self.opacity())
 
     def mouseDoubleClickEvent(self, event):
         if self.canvas_workspace:
@@ -492,7 +536,7 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             view = self.canvas_workspace.view
             scene_pos = self.scenePos()
             view_pos = view.mapFromScene(scene_pos)
-            self.editor = TextEditorWidget(view_pos.x(), view_pos.y(), existing_model=self.model, parent=view, center_in_view=True)
+            self.editor = TextEditorWidget(view_pos.x(), view_pos.y(), existing_model=self.model, parent=view, center_in_view=False)
             self.editor.editing_finished.connect(self._on_editing_finished)
             self.editor.show()
             self.editor.setFocus()
@@ -501,8 +545,13 @@ class WriteToImageGraphicsItem(QGraphicsObject):
 
     def _on_editing_finished(self, updated_model):
         if updated_model:
+            old_scale = self.scale()
             self.model = updated_model
             self._load_image()
+            if old_scale > 0:
+                self.setScale(old_scale)
+                self.model.scale_w = old_scale
+                self.model.scale_h = old_scale
             self.show()
         else:
             if self.scene():
@@ -526,13 +575,17 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             is_bold=getattr(self.model, 'is_bold', False),
             is_italic=getattr(self.model, 'is_italic', False),
             is_underline=getattr(self.model, 'is_underline', False),
-            text_effect=getattr(self.model, 'text_effect', 'none')
+            text_effect=getattr(self.model, 'text_effect', 'none'),
+            text_align=getattr(self.model, 'text_align', 'auto')
         )
         self.model.image_path = image_path
         self._load_image()
         
-        if old_scale > 0 and old_scale != 1.0:
+        if old_scale > 0:
             self.setScale(old_scale)
+            if hasattr(self, 'model') and self.model:
+                self.model.scale_w = old_scale
+                self.model.scale_h = old_scale
 
     def to_dict(self):
         data = self.model.to_dict()
@@ -545,7 +598,15 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             "opacity": self.opacity(),
             "layer_name": self.layer_name,
             "anim_duration": self.anim_duration,
-            "anim_delay": self.anim_delay
+            "anim_delay": self.anim_delay,
+            "entrance_mode": getattr(self, "entrance_mode", "draw"),
+            "motion_settings": getattr(self, "motion_settings", {
+                "style": "hand_drag",
+                "direction": "left",
+                "duration": 1.5,
+                "easing": "smooth",
+                "sfx": "none"
+            })
         })
         return data
 
@@ -566,7 +627,11 @@ class WriteToImageGraphicsItem(QGraphicsObject):
             height=data.get("height", 0.0),
             image_path=data.get("image_path", ""),
             algorithm_style=data.get("algorithm_style", "linear"),
-            text_effect=data.get("text_effect", "none")
+            text_effect=data.get("text_effect", "none"),
+            writing_hand_type=data.get("writing_hand_type", "right"),
+            writing_hand_style=data.get("writing_hand_style", "default"),
+            writing_hand_size=data.get("writing_hand_size", 1.0),
+            text_align=data.get("text_align", "auto")
         )
         model.sfx_name = data.get("sfx_name", "None")
         model.sfx_volume = data.get("sfx_volume", 100)
@@ -579,5 +644,17 @@ class WriteToImageGraphicsItem(QGraphicsObject):
         item.layer_name = data.get("layer_name", "Text")
         item.anim_duration = data.get("anim_duration", 2.0)
         item.anim_delay = data.get("anim_delay", 0.0)
+        item.entrance_mode = data.get("entrance_mode", "draw")
+        item.motion_settings = data.get("motion_settings", {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        })
+        item._motion_target_pos = QPointF(item.pos().x(), item.pos().y())
+        item._motion_target_scale = float(item.scale())
+        item._motion_target_rotation = float(item.rotation())
+        item._motion_target_opacity = float(item.opacity())
         return item
 

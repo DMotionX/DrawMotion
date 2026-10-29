@@ -9,7 +9,7 @@
 
 ## Overview
 
-DrawMotion ("the Software") is an open-source desktop application developed by **Mohamed Fadl** and the **EASY SOFT TEAM** and distributed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
+DrawMotion ("the Software") is an open-source desktop application developed by **Mohamed Fadl** and the **DrawMotion Team** and distributed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
 
 This Privacy Policy explains how DrawMotion handles your data when you use the Software.
 
@@ -88,7 +88,8 @@ Any updates to this Privacy Policy will be committed directly to the official re
 
 For privacy inquiries or concerns:
 
-**EASY SOFT TEAM — Founded by Mohamed Fadl**
+**DrawMotion Team — Founded by Mohamed Fadl**
 📧 [easysoft.dv2team@gmail.com](mailto:easysoft.dv2team@gmail.com)
+📘 [Official Facebook](https://www.facebook.com/profile.php?id=61595676097302)
 🐦 [@MohamedFad19757](https://x.com/MohamedFad19757)
 🔗 [https://github.com/DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)

@@ -32,6 +32,14 @@ class AnimatedRasterItem(QGraphicsObject):
         self.image_path      = ""
         self.sfx_name        = "None"
         self.sfx_volume      = 100
+        self.entrance_mode   = "draw"
+        self.motion_settings = {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        }
 
         # Limit to 1080 internally to save memory
         max_res = 1080.0
@@ -152,6 +160,13 @@ class AnimatedRasterItem(QGraphicsObject):
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(rect)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+        self._motion_target_scale = float(self.scale())
+        self._motion_target_rotation = float(self.rotation())
+        self._motion_target_opacity = float(self.opacity())
+
     def to_dict(self):
         return {
             "type": "AnimatedRasterItem",
@@ -169,6 +184,14 @@ class AnimatedRasterItem(QGraphicsObject):
             "anim_easing": self.anim_easing,
             "sfx_name": getattr(self, "sfx_name", "None"),
             "sfx_volume": getattr(self, "sfx_volume", 100),
+            "entrance_mode": getattr(self, "entrance_mode", "draw"),
+            "motion_settings": getattr(self, "motion_settings", {
+                "style": "hand_drag",
+                "direction": "left",
+                "duration": 1.5,
+                "easing": "smooth",
+                "sfx": "none"
+            }),
             "image_path": getattr(self, 'image_path', "")
         }
 
@@ -190,8 +213,20 @@ class AnimatedRasterItem(QGraphicsObject):
         item.anim_type = data.get('anim_type', "Draw")
         item.anim_dir = data.get('anim_dir', "From Left")
         item.anim_easing = data.get('anim_easing', "Linear")
+        item.entrance_mode = data.get('entrance_mode', "draw")
+        item.motion_settings = data.get('motion_settings', {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        })
         item.sfx_name = data.get('sfx_name', "None")
         item.sfx_volume = data.get('sfx_volume', 100)
+        item._motion_target_pos = QPointF(item.pos().x(), item.pos().y())
+        item._motion_target_scale = float(item.scale())
+        item._motion_target_rotation = float(item.rotation())
+        item._motion_target_opacity = float(item.opacity())
         
         item.update_plan()
         return item

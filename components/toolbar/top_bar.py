@@ -10,6 +10,7 @@ from utils.icons import get_icon
 from core.settings_manager import SettingsManager
 
 class TopBar(QFrame):
+    hub_requested = Signal()
     tool_selected = Signal(str)
     zoom_in = Signal()
     zoom_out = Signal()
@@ -53,7 +54,7 @@ class TopBar(QFrame):
         layout.setContentsMargins(12, 6, 12, 6)
         layout.setSpacing(6) # Reduced spacing to fit everything
 
-        # Logo / Brand
+        # Logo / Brand (Clickable to return to Projects Hub)
         logo_layout = QHBoxLayout()
         logo_layout.setSpacing(8)
         logo_layout.setContentsMargins(0, 0, 0, 0)
@@ -63,6 +64,9 @@ class TopBar(QFrame):
         from utils.paths import resource_path
         logo_icon = QLabel()
         logo_icon.setStyleSheet("background: transparent;")
+        logo_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        logo_icon.setToolTip("Open Projects Hub (Ctrl+H)")
+        logo_icon.mousePressEvent = lambda e: self.hub_requested.emit()
         
         _logo_path = resource_path("resources/branding/PNG/DrawMotion_64x64.png")
         if os.path.exists(_logo_path):
@@ -82,8 +86,40 @@ class TopBar(QFrame):
             f"color: {THEME_COLORS['text_primary']}; font-weight: bold; "
             f"font-size: 14px; background: transparent; letter-spacing: 0.5px;"
         )
+        logo_text.setCursor(Qt.CursorShape.PointingHandCursor)
+        logo_text.setToolTip("Open Projects Hub (Ctrl+H)")
+        logo_text.mousePressEvent = lambda e: self.hub_requested.emit()
         logo_layout.addWidget(logo_text)
         layout.addLayout(logo_layout)
+
+        # Dedicated Projects Hub Return Button
+        self.hub_btn = QToolButton()
+        self.hub_btn.setText(" Projects Hub ")
+        self.hub_btn.setIcon(get_icon("folder", "#2E8B57"))
+        self.hub_btn.setIconSize(QSize(16, 16))
+        self.hub_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.hub_btn.setToolTip("Open Projects Hub to switch or manage projects (Ctrl+H)")
+        self.hub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hub_btn.setStyleSheet("""
+            QToolButton {
+                font-size: 11px;
+                font-weight: bold;
+                color: #FFFFFF;
+                background-color: #1A241F;
+                border: 1px solid #2E8B57;
+                border-radius: 6px;
+                padding: 4px 8px;
+            }
+            QToolButton:hover {
+                background-color: #24352B;
+                border-color: #3FA36D;
+            }
+            QToolButton:pressed {
+                background-color: #16452B;
+            }
+        """)
+        self.hub_btn.clicked.connect(self.hub_requested.emit)
+        layout.addWidget(self.hub_btn)
         
         # Tools Divider
         div1 = QFrame()

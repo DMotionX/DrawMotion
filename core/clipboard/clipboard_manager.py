@@ -76,29 +76,10 @@ class ClipboardManager(QObject):
             elif item_type == "SVGCanvasItem":
                 from asset_library.engine.svg_canvas_item import SVGCanvasItem
                 item = SVGCanvasItem.from_dict(data)
-            elif item_type == "WriteToImageGraphicsItem":
-                # Fallback for WriteToImage which doesn't have from_dict yet
+            elif item_type in ("WriteToImageGraphicsItem", "WriteToAnimatedImageItem"):
                 from components.write_to_image.graphics_item import WriteToImageGraphicsItem
-                from components.write_to_image.models import WriteToImageModel
-                
-                # Flatten the data since to_dict outputs nested 'transform', 'appearance', 'timing'
-                flat_data = {k: v for k, v in data.items() if k not in ['transform', 'appearance', 'timing', 'type']}
-                if 'transform' in data:
-                    flat_data['pos_x'] = data['transform'].get('x', 0)
-                    flat_data['pos_y'] = data['transform'].get('y', 0)
-                    flat_data['scale_w'] = data['transform'].get('scale_w', 1.0)
-                    flat_data['scale_h'] = data['transform'].get('scale_h', 1.0)
-                    flat_data['rotation'] = data['transform'].get('rotation', 0.0)
-                if 'appearance' in data:
-                    flat_data['opacity'] = data['appearance'].get('opacity', 1.0)
-                    flat_data['blend_mode'] = data['appearance'].get('blend_mode', 'normal')
-                if 'timing' in data:
-                    flat_data['start_time'] = data['timing'].get('start', 0.0)
-                    flat_data['duration'] = data['timing'].get('duration', 1.0)
-                    flat_data['delay'] = data['timing'].get('delay', 0.0)
-                    
-                model = WriteToImageModel(**flat_data)
-                item = WriteToImageGraphicsItem(model, self.workspace)
+                item = WriteToImageGraphicsItem.from_dict(data)
+                item.canvas_workspace = self.workspace
             elif item_type == "MindMapNodeItem":
                 from components.mind_map_builder.models import MindMapNodeModel
                 from components.mind_map_builder.node_item import MindMapNodeItem

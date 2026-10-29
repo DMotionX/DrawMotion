@@ -24,7 +24,7 @@
   <a href="#key-features"><b>Key Features</b></a> •
   <a href="#quickstart-run-locally"><b>Developer Setup</b></a> •
   <a href="#repository-architecture"><b>Architecture</b></a> •
-  <a href="#about-the-creator-and-easy-soft-team"><b>EASY SOFT Team</b></a> •
+  <a href="#about-the-creator-and-drawmotion-team"><b>DrawMotion Team</b></a> •
   <a href="docs/README.md"><b>Documentation</b></a> •
   <a href="CONTRIBUTING.md"><b>Contributing</b></a>
 </p>
@@ -130,16 +130,16 @@ DrawMotion/
 
 ---
 
-## 👥 About the Creator and EASY SOFT Team
+## 👥 About the Creator and DrawMotion Team
 
-DrawMotion was conceived, engineered, and founded by **Mohamed Fadl** as Founder and Lead Engineer, developed under the banner of the **EASY SOFT TEAM**.
+DrawMotion was conceived, engineered, and founded by **Mohamed Fadl** as Founder and Lead Engineer, developed under the banner of the **DrawMotion Team**.
 
-EASY SOFT is an independent open-source software team dedicated to fighting digital monopolies by engineering high-speed, local-first creative software that respects user privacy and creative sovereignty.
+DrawMotion Team is an independent open-source software collective dedicated to fighting digital monopolies by engineering high-speed, local-first creative software that respects user privacy and creative sovereignty.
 
 ### 🌐 Official Channels & Community
 * **Official Microsoft Store:** [DrawMotion on Microsoft Store](https://apps.microsoft.com/detail/9NMVGFL73RH4)
 * **Official Website:** [drawmotion-web.vercel.app](https://drawmotion-web.vercel.app/)
-* **Official Facebook Page:** [EASY SOFT Team Official](https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR)
+* **Official Facebook Page:** [DrawMotion Official](https://www.facebook.com/profile.php?id=61595676097302)
 * **Founder on X / Twitter:** [@MohamedFad19757](https://x.com/MohamedFad19757)
 * **GitHub Repository:** [DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion)
 * **Support & Inquiries:** `easysoft.dv2team@gmail.com`

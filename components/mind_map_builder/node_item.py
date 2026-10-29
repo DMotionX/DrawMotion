@@ -155,6 +155,14 @@ class MindMapNodeItem(QGraphicsObject):
         
         self.progress = 1.0 
         self._is_updating = False
+        self.entrance_mode = getattr(self.model, 'entrance_mode', 'draw')
+        self.motion_settings = getattr(self.model, 'motion_settings', {
+            "style": "hand_drag",
+            "direction": "left",
+            "duration": 1.5,
+            "easing": "smooth",
+            "sfx": "none"
+        })
         
         self.resize_handle = NodeHandle(self, "bottom-right")
         self.port_top = PortHandle(self)
@@ -324,11 +332,19 @@ class MindMapNodeItem(QGraphicsObject):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             self.moved.emit(self)
+            self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+            self._motion_target_scale = float(self.scale())
+            self._motion_target_rotation = float(self.rotation())
+            self._motion_target_opacity = float(self.opacity())
         elif change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             if self.isSelected():
                 self.resize_handle.show()
             else:
                 self.resize_handle.hide()
+            self._motion_target_pos = QPointF(self.pos().x(), self.pos().y())
+            self._motion_target_scale = float(self.scale())
+            self._motion_target_rotation = float(self.rotation())
+            self._motion_target_opacity = float(self.opacity())
         return super().itemChange(change, value)
         
     def mouseDoubleClickEvent(self, event):

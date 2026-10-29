@@ -86,6 +86,16 @@ class CustomGraphicsView(QGraphicsView):
                     
         super().keyPressEvent(event)
 
+    def mousePressEvent(self, event):
+        from components.canvas.workspace import ToolMode
+        if getattr(self.workspace, 'current_mode', None) == ToolMode.WRITE_TO_IMAGE:
+            if event.button() == Qt.MouseButton.LeftButton:
+                if hasattr(self.workspace, 'trigger_write_to_image_at_view_pos'):
+                    self.workspace.trigger_write_to_image_at_view_pos(event.pos())
+                    event.accept()
+                    return
+        super().mousePressEvent(event)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasText() and event.mimeData().text().startswith("mind_map_template:"):
             event.acceptProposedAction()

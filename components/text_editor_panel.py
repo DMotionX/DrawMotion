@@ -106,12 +106,18 @@ class TextEditorPanel(QWidget):
         # Row 2: Alignments
         self.btn_align_left = self._create_tool_btn("Left", "font-size: 12px;")
         self.btn_align_left.setFixedSize(60, 36)
+        self.btn_align_left.setCheckable(True)
+        self.btn_align_left.clicked.connect(lambda: self._set_alignment("left"))
         
         self.btn_align_center = self._create_tool_btn("Center", "font-size: 12px;")
         self.btn_align_center.setFixedSize(60, 36)
+        self.btn_align_center.setCheckable(True)
+        self.btn_align_center.clicked.connect(lambda: self._set_alignment("center"))
         
         self.btn_align_right = self._create_tool_btn("Right", "font-size: 12px;")
         self.btn_align_right.setFixedSize(60, 36)
+        self.btn_align_right.setCheckable(True)
+        self.btn_align_right.clicked.connect(lambda: self._set_alignment("right"))
         
         grid.addWidget(self.btn_align_left, 1, 0)
         grid.addWidget(self.btn_align_center, 1, 1)
@@ -170,6 +176,21 @@ class TextEditorPanel(QWidget):
         self.btn_italic.setChecked(getattr(self.model, 'is_italic', False))
         self.btn_underline.setChecked(getattr(self.model, 'is_underline', False))
         
+        # Update alignment buttons
+        align_val = getattr(self.model, 'text_align', 'auto')
+        if align_val == 'auto':
+            # Check dominant language
+            import re
+            txt = getattr(self.model, 'text', '')
+            ar = len(re.findall(r'[\u0600-\u06FF]', txt))
+            en = len(re.findall(r'[a-zA-Z]', txt))
+            is_rtl_dominant = ar > en
+            align_val = 'right' if is_rtl_dominant else 'left'
+
+        self.btn_align_left.setChecked(align_val == 'left')
+        self.btn_align_center.setChecked(align_val == 'center')
+        self.btn_align_right.setChecked(align_val == 'right')
+
         # Update Color indicator
         color = self.model.color
         self.btn_color.setStyleSheet(f"""
@@ -189,6 +210,14 @@ class TextEditorPanel(QWidget):
         """)
         
         self._updating = False
+
+    def _set_alignment(self, align_str: str):
+        if self._updating or not self.model: return
+        self.model.text_align = align_str
+        self.btn_align_left.setChecked(align_str == "left")
+        self.btn_align_center.setChecked(align_str == "center")
+        self.btn_align_right.setChecked(align_str == "right")
+        self._trigger_update()
 
     def _toggle_bold(self):
         if self._updating or not self.model: return

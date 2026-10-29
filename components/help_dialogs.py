@@ -767,7 +767,7 @@ class LegalPoliciesDialog(QDialog):
         footer_layout = QHBoxLayout()
         footer_layout.setSpacing(10)
         
-        credit_lbl = QLabel("EASY SOFT TEAM • Founded by Mohamed Fadl • easysoft.dv2team@gmail.com")
+        credit_lbl = QLabel("DrawMotion Team • Founded by Mohamed Fadl • easysoft.dv2team@gmail.com")
         credit_lbl.setStyleSheet("color: #647B70; font-size: 11px;")
         footer_layout.addWidget(credit_lbl)
         
@@ -834,7 +834,7 @@ class LegalPoliciesDialog(QDialog):
             "### 2. You Own Your Output (Full Monetization Rights)\n"
             "**All videos, animations, illustrations, and exported media you produce with DrawMotion belong 100% to you.**\n"
             "- You are completely free to monetize your creations on YouTube, TikTok, Facebook, social media, commercial advertising, or client freelance contracts.\n"
-            "- **Zero Royalties:** You do not owe any licensing fees, royalties, or revenue share to EASY SOFT TEAM.\n"
+            "- **Zero Royalties:** You do not owe any licensing fees, royalties, or revenue share to DrawMotion Team.\n"
             "- Attribution is appreciated but never mandatory for commercial works.\n\n"
             "### 3. Free & Open-Source Software (GNU GPLv3)\n"
             "DrawMotion is licensed under the **GNU General Public License v3.0 (GPLv3)**.\n"
@@ -847,10 +847,10 @@ class LegalPoliciesDialog(QDialog):
             "**Open-Source LGPL Exception:**\n"
             "In compliance with the GNU Lesser General Public License (LGPLv3) governing Qt 6 and PySide6, you retain the right to modify or replace the dynamically linked Qt/PySide6 shared libraries (.dll, .pyd) with your own compatible versions.\n\n"
             "### 5. Code Signing & Antivirus Transparency\n"
-            "DrawMotion binaries are signed with a private self-signed certificate under EASY SOFT TEAM rather than an expensive commercial certificate authority. Every release is verified through automated scanning tooling and VirusTotal prior to distribution.\n\n"
+            "DrawMotion binaries are signed with a private self-signed certificate under DrawMotion Team rather than an expensive commercial certificate authority. Every release is verified through automated scanning tooling and VirusTotal prior to distribution.\n\n"
             "### 6. Experimental Beta Status & Disclaimer of Warranty\n"
             "DrawMotion is in an active Beta Development Phase. Users are advised to maintain regular backups of project files.\n"
-            "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR (MOHAMED FADL) AND EASY SOFT TEAM MAKE NO REPRESENTATION OR WARRANTY THAT THE SOFTWARE WILL OPERATE UNINTERRUPTED, ERROR-FREE, OR SECURE."
+            "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE AUTHOR (MOHAMED FADL) AND DRAWMOTION TEAM MAKE NO REPRESENTATION OR WARRANTY THAT THE SOFTWARE WILL OPERATE UNINTERRUPTED, ERROR-FREE, OR SECURE."
         )
 
     def _get_privacy_markdown(self) -> str:

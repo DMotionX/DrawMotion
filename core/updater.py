@@ -1,4 +1,4 @@
-# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# Copyright (c) 2026 Mohamed Fadl & DrawMotion Team
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import json
@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QObject
 from utils.theme import THEME_COLORS
 
 # Current application version
-CURRENT_VERSION = "1.7.12"
+CURRENT_VERSION = "1.7.13"
 
 # Official public open-source repository
 GITHUB_REPO = "DMotionX/DrawMotion"

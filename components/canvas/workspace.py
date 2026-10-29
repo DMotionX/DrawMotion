@@ -79,7 +79,13 @@ class CanvasWorkspace(QFrame):
         self.hand_item.hide()
         self.scene.addItem(self.hand_item)
         
-        self.animator_engine = AnimatorEngine(self.hand_item, self)
+        from components.write_to_image.hand_manager import WritingHandItem
+        self.writing_hand_item = WritingHandItem()
+        self.writing_hand_item.setZValue(9999)
+        self.writing_hand_item.hide()
+        self.scene.addItem(self.writing_hand_item)
+        
+        self.animator_engine = AnimatorEngine(self.hand_item, self, writing_hand_item=self.writing_hand_item)
         self.animator_engine.progress_updated.connect(self.animation_progress.emit)
         self.animator_engine.progress_updated.connect(self._on_progress_updated)
         
@@ -558,6 +564,47 @@ class CanvasWorkspace(QFrame):
                 
         return max_end_time + 0.1
             
+    def preview_item_motion(self, item):
+        """
+        Executes a targeted, isolated motion preview for a single item.
+        Does not disrupt the rest of the project or audio tracks.
+        """
+        if not item:
+            return
+            
+        # Stop any active global playback
+        self.animator_engine.stop()
+        
+        # Determine parent scene artboard if any
+        parent_board = item.parentItem()
+        if parent_board in self.artboards:
+            target_idx = self.artboards.index(parent_board)
+            if self.current_scene_index != target_idx:
+                self.focus_on_artboard(target_idx, animated=False)
+                
+        # Synchronize queue with the item's scene items
+        scene_items = self.get_current_scene_items()
+        if item not in scene_items and item in self.user_items:
+            scene_items = [item]
+        elif not scene_items:
+            scene_items = [item]
+            
+        self.animator_engine.sync_queue(scene_items, force_recompile=True)
+        
+        # Locate the action in compiled schedule
+        target_act = None
+        for act in self.animator_engine.schedule:
+            if act.get('type') == 'draw' and act.get('item') is item:
+                target_act = act
+                break
+                
+        if target_act:
+            self.animator_engine.play_range(target_act['start'], target_act['end'])
+        else:
+            delay = float(getattr(item, 'anim_delay', getattr(item, '_anim_delay', 0.0)))
+            dur = float(getattr(item, 'anim_duration', getattr(item, '_anim_duration', 1.5)))
+            self.animator_engine.play_range(delay, delay + dur)
+
     def add_item_to_scene(self, item):
         if not self.artboards: return
         target_board = self.artboards[self.current_scene_index]
@@ -810,43 +857,81 @@ class CanvasWorkspace(QFrame):
         
         # Handle Write-To-Image Tool
         if self.current_mode == ToolMode.WRITE_TO_IMAGE:
-            if not self.artboards:
-                return
-                
-            target_board = self.artboards[self.current_scene_index]
             view_pos = self.view.mapFromParent(event.pos())
-            scene_pos = self.view.mapToScene(view_pos)
+            self.trigger_write_to_image_at_view_pos(view_pos)
             
-            from components.write_to_image import WriteToImageModel, TextEditorWidget, WriteToImageGraphicsItem
+    def trigger_write_to_image_at_view_pos(self, view_pos):
+        if not self.artboards or self.current_scene_index < 0 or self.current_scene_index >= len(self.artboards):
+            return
             
-            model = WriteToImageModel(
-                id=f"wti_{id(self)}_{int(scene_pos.x())}",
-                name="Text Image",
-                pos_x=scene_pos.x(),
-                pos_y=scene_pos.y(),
-                duration=0.0  # Let text_editor calculate it based on text length
-            )
-            editor = TextEditorWidget(view_pos.x(), view_pos.y(), existing_model=model, parent=self.view, center_in_view=True)
-            
-            def _on_finish(updated_model):
-                if updated_model and updated_model.image_path:
-                    item = WriteToImageGraphicsItem(updated_model, canvas_workspace=self)
-                    # Auto placement
-                    item.anim_delay = self._calculate_auto_placement_delay(target_board)
-                    # Add to target board
-                    item.setParentItem(target_board)
+        target_board = self.artboards[self.current_scene_index]
+        scene_pos = self.view.mapToScene(view_pos)
+        board_click_pos = target_board.mapFromScene(scene_pos)
+        
+        from components.write_to_image import WriteToImageModel, TextEditorWidget, WriteToImageGraphicsItem
+        
+        model = WriteToImageModel(
+            id=f"wti_{id(self)}_{int(scene_pos.x())}",
+            name="Text Image",
+            pos_x=board_click_pos.x(),
+            pos_y=board_click_pos.y(),
+            font_size=42,
+            duration=0.0  # Let text_editor calculate it based on text length
+        )
+        editor = TextEditorWidget(view_pos.x(), view_pos.y(), existing_model=model, parent=self.view, center_in_view=False)
+        
+        def _on_finish(updated_model):
+            if updated_model and updated_model.image_path:
+                item = WriteToImageGraphicsItem(updated_model, canvas_workspace=self)
+                # Auto placement
+                item.anim_delay = self._calculate_auto_placement_delay(target_board)
+                # Add to target board
+                item.setParentItem(target_board)
+
+                # Smart Text Auto-Fit: Proportion to active artboard (target: ~50-60% of artboard width)
+                board_rect = target_board.boundingRect()
+                text_rect = item.boundingRect()
+                if text_rect.width() > 0 and board_rect.width() > 0:
+                    desired_scale_w = (board_rect.width() * 0.55) / text_rect.width()
+                    desired_scale_h = (board_rect.height() * 0.35) / text_rect.height() if text_rect.height() > 0 else desired_scale_w
+                    optimal_scale = min(desired_scale_w, desired_scale_h)
+                    optimal_scale = max(1.0, min(optimal_scale, 5.0))
+                    item.setScale(optimal_scale)
+                    if hasattr(item, 'model') and item.model:
+                        item.model.scale_w = optimal_scale
+                        item.model.scale_h = optimal_scale
+
+                    # Place at user's click position on target_board, clamped within board_rect
+                    pos_x = board_click_pos.x()
+                    pos_y = board_click_pos.y()
+                    
+                    scaled_w = text_rect.width() * optimal_scale
+                    scaled_h = text_rect.height() * optimal_scale
+                    
+                    max_x = max(0.0, board_rect.width() - scaled_w)
+                    max_y = max(0.0, board_rect.height() - scaled_h)
+                    
+                    clamped_x = max(0.0, min(pos_x, max_x))
+                    clamped_y = max(0.0, min(pos_y, max_y))
+                    
+                    item.setPos(clamped_x, clamped_y)
+                    if hasattr(item, 'model') and item.model:
+                        item.model.pos_x = clamped_x
+                        item.model.pos_y = clamped_y
+
+                if item.scene() is None:
                     self.scene.addItem(item)
-                    self.user_items.append(item)
-                    self.distribute_global_time(respect_board_duration=False)
-                    self.items_changed.emit(self.get_current_scene_items())
-            
-            editor.editing_finished.connect(_on_finish)
-            editor.show()
-            editor.setFocus()
-            
-            # Switch back to select mode automatically
-            self.set_tool_mode("Select")
-            # Need to update UI button if possible, but for now we just change mode internally.
+                self.user_items.append(item)
+                self.distribute_global_time(respect_board_duration=False)
+                self.items_changed.emit(self.get_current_scene_items())
+        
+        editor.editing_finished.connect(_on_finish)
+        editor.show()
+        editor.setFocus()
+        
+        # Switch back to select mode automatically
+        self.set_tool_mode("Select")
+        # Need to update UI button if possible, but for now we just change mode internally.
             
         # [FROZEN: CWE] Disable Text Mode Node Creation
         # if self.current_mode == ToolMode.TEXT:
@@ -986,5 +1071,41 @@ class CanvasWorkspace(QFrame):
         sorted_items = sorted(self.user_items, key=lambda x: (getattr(x.parentItem(), 'scene_index', 0), self.user_items.index(x)))
         self.animator_engine.sync_queue(sorted_items)
         self.animator_engine.seek_only(time_sec)
+
+    def play_scene_animation(self, scene_index: int, start_time: float = None, duration: float = None):
+        """Plays animation preview and synchronized audio strictly for a specific scene."""
+        if not self.artboards or scene_index < 0 or scene_index >= len(self.artboards):
+            return
+            
+        self.animator_engine.stop()
+        self.reset_transition_flags()
+        
+        # Focus canvas viewport on this artboard
+        self.focus_on_artboard(scene_index)
+        
+        # Sort items strictly by scene index, then by insertion order
+        sorted_items = sorted(self.user_items, key=lambda x: (getattr(x.parentItem(), 'scene_index', 0), self.user_items.index(x)))
+        self.animator_engine.sync_queue(sorted_items)
+        
+        # If start_time or duration not explicitly passed, compute accurately from scene sequence
+        if start_time is None or duration is None:
+            curr_t = 0.0
+            for i, board in enumerate(self.artboards):
+                if i > 0 and curr_t > 0:
+                    prev_b = self.artboards[i - 1]
+                    t_type = getattr(prev_b, 'transition_type', None)
+                    t_dur = getattr(prev_b, 'transition_duration', 1.0) if (t_type and t_type != "None") else 0.2
+                    curr_t += t_dur
+                b_dur = getattr(board, 'duration', 8.0)
+                if i == scene_index:
+                    start_time = curr_t
+                    duration = b_dur
+                    break
+                curr_t += b_dur
+                
+        start_time = max(0.0, float(start_time or 0.0))
+        end_time = start_time + max(0.5, float(duration or 8.0))
+        
+        self.animator_engine.play_range(start_time, end_time)
 
 

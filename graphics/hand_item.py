@@ -54,6 +54,13 @@ class HandItem(QGraphicsPixmapItem):
     def _on_setting_changed(self, key: str, value):
         if key == "hand_style":
             self.set_hand_style(value)
+        elif key == "hand_size":
+            try:
+                new_scale = float(value) / 2.0
+                if self.isVisible() and not self._is_drag_mode:
+                    self.setScale(new_scale)
+            except (ValueError, TypeError):
+                pass
         
     def set_hand_style(self, style: str):
         self.current_style = style
