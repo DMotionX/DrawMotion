@@ -1,4 +1,4 @@
-# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# Copyright (c) 2026 Mohamed Fadl & DrawMotion Team
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 Purpose: Project management engine.

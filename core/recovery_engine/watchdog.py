@@ -120,6 +120,23 @@ def is_recovery_required(current_version: str) -> tuple[bool, dict]:
         
     return needs_recovery, state
 
+def is_strictly_older(target_version: str, current_version: str) -> bool:
+    """
+    Returns True ONLY if target_version is strictly older than current_version.
+    Example: '1.7.11' < '1.7.12' -> True
+             '1.7.12' < '1.7.12' -> False
+             '1.7.13' < '1.7.12' -> False
+    """
+    if not target_version or not current_version:
+        return False
+    try:
+        t_parts = [int(p) for p in target_version.split('.') if p.isdigit()]
+        c_parts = [int(p) for p in current_version.split('.') if p.isdigit()]
+        return t_parts < c_parts
+    except Exception:
+        return False
+
+
 def register_installer_in_vault(installer_path: str, version: str) -> str:
     if not installer_path or not os.path.exists(installer_path):
         return ""
@@ -131,20 +148,26 @@ def register_installer_in_vault(installer_path: str, version: str) -> str:
             shutil.copy2(installer_path, dest_path)
         
         state = load_boot_health()
-        state["previous_installer_path"] = dest_path
-        state["previous_version"] = version
-        save_boot_health(state)
+        cur_v = state.get("current_version", "")
+        # Only set as previous_version if it is strictly older than current version
+        if cur_v and is_strictly_older(version, cur_v):
+            state["previous_installer_path"] = dest_path
+            state["previous_version"] = version
+            save_boot_health(state)
         return dest_path
     except Exception:
         return installer_path
 
-def get_previous_installer_info() -> tuple[str, str]:
+
+def get_previous_installer_info(current_version: str = None) -> tuple[str, str]:
     state = load_boot_health()
+    cur_v = current_version or state.get("current_version", "")
     prev_version = state.get("previous_version", "")
     prev_path = state.get("previous_installer_path", "")
     
     if prev_path and os.path.exists(prev_path):
-        return prev_version, prev_path
+        if not cur_v or is_strictly_older(prev_version, cur_v):
+            return prev_version, prev_path
 
     # Check vault directory fallback
     vault = get_vault_dir()
@@ -152,10 +175,12 @@ def get_previous_installer_info() -> tuple[str, str]:
         files = [f for f in os.listdir(vault) if f.startswith("DrawMotion_Setup_v") and f.endswith(".exe")]
         if files:
             files.sort()
-            latest = files[-1]
-            extracted_v = latest.replace("DrawMotion_Setup_v", "").replace(".exe", "")
-            full_path = os.path.join(vault, latest)
-            return extracted_v, full_path
+            # Pick the newest installer that is strictly older than current_version
+            for f in reversed(files):
+                extracted_v = f.replace("DrawMotion_Setup_v", "").replace(".exe", "")
+                if not cur_v or is_strictly_older(extracted_v, cur_v):
+                    full_path = os.path.join(vault, f)
+                    return extracted_v, full_path
 
     return "", ""
 

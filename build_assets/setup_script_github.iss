@@ -1,12 +1,12 @@
 [Setup]
 SourceDir=..
 AppName=DrawMotion
-AppVersion=1.7.12
-AppPublisher=EASY SOFT TEAM (Mohamed Fadl)
+AppVersion=1.7.13
+AppPublisher=DrawMotion Team (Mohamed Fadl)
 AppPublisherURL=https://github.com/DMotionX/DrawMotion
 AppSupportURL=https://drawmotion-web.vercel.app/
 AppUpdatesURL=https://github.com/DMotionX/DrawMotion/releases
-DefaultDirName={autopf}\EASY SOFT\DrawMotion
+DefaultDirName={autopf}\DrawMotion
 DefaultGroupName=DrawMotion
 OutputDir=build_out
 OutputBaseFilename=DrawMotion_Setup

@@ -7,7 +7,7 @@ from PySide6.QtGui import QPainterPath, QColor
 from PySide6.QtCore import QPointF
 
 SCHEMA_VERSION = 1
-APP_VERSION = "1.7.12" # Current target version
+APP_VERSION = "1.7.13" # Current target version
 
 class SerializerEngine:
     """
@@ -36,7 +36,8 @@ class SerializerEngine:
         elements = []
         for i in range(path.elementCount()):
             el = path.elementAt(i)
-            el_type = int(el.type) # 0=MoveTo, 1=LineTo, 2=CurveTo, 3=CurveToData
+            raw_type = getattr(el.type, 'value', el.type)
+            el_type = int(raw_type) # 0=MoveTo, 1=LineTo, 2=CurveTo, 3=CurveToData
             elements.append({
                 "type": el_type,
                 "x": el.x,

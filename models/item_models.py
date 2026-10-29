@@ -38,6 +38,16 @@ class BaseItemModel:
     # SFX
     sfx_name: str = "None"
     sfx_volume: int = 100
+
+    # Motion Engine settings
+    entrance_mode: str = "draw"
+    motion_settings: Dict[str, Any] = field(default_factory=lambda: {
+        "style": "hand_drag",
+        "direction": "left",
+        "duration": 1.5,
+        "easing": "smooth",
+        "sfx": "none"
+    })
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -46,6 +56,8 @@ class BaseItemModel:
             "type": self.item_type,
             "sfx_name": self.sfx_name,
             "sfx_volume": self.sfx_volume,
+            "entrance_mode": self.entrance_mode,
+            "motion_settings": self.motion_settings,
             "transform": {
                 "x": self.pos_x,
                 "y": self.pos_y,

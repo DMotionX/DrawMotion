@@ -26,8 +26,8 @@ class SettingsManager(QObject):
         
         # Drawing & Animation
         "default_drawing_style": "solid",
-        "hand_size": 3.0,
-        "drag_hand_size": 1.0,
+        "hand_size": 2.0,
+        "drag_hand_size": 2.2,
         
         # Export Settings
         "export_resolution": "1080p",
@@ -45,6 +45,12 @@ class SettingsManager(QObject):
         # Hand Style — unified key
         # Values: 'default' | 'left' | 'young_man' | 'old_man' | 'woman' | 'none'
         "hand_style": "default",
+        
+        # Dedicated Writing Hand Settings
+        "writing_hand_type": "right",
+        "writing_hand_style": "default",
+        "writing_hand_size": 1.0,
+        "writing_algorithm": "realistic_hybrid",
         
         # Ink Effect — values: 'dot' | 'particles' | 'none'
         "ink_effect_type": "dot",

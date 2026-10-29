@@ -26,7 +26,7 @@ class SafeRecoveryDialog(QDialog):
     def __init__(self, current_version: str, parent=None):
         super().__init__(parent)
         self.current_version = current_version
-        self.prev_version, self.prev_installer = get_previous_installer_info()
+        self.prev_version, self.prev_installer = get_previous_installer_info(current_version)
         self.user_choice = "cancel"
 
         self.setWindowTitle("DrawMotion - Startup Recovery Assistant")

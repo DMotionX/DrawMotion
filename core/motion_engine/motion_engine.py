@@ -55,11 +55,19 @@ class MotionEngine:
         motion_style = settings.get("style", "hand_drag")
         direction = settings.get("direction", "left")
         
-        # Seamless timeline synchronization: adapt motion duration to block duration
+        # Respect user's motion speed/duration setting from Inspector slider:
+        # The entrance movement runs for the user-selected duration, capped by action_duration.
+        try:
+            user_dur = float(settings.get("duration", 1.5))
+            if user_dur <= 0:
+                user_dur = 1.5
+        except (ValueError, TypeError):
+            user_dur = 1.5
+
         if action_duration > 0:
-            motion_dur = action_duration
+            motion_dur = max(0.3, min(action_duration, user_dur))
         else:
-            motion_dur = float(settings.get("duration", 1.5))
+            motion_dur = max(0.3, user_dur)
             
         easing = settings.get("easing", "smooth")
 
@@ -83,10 +91,13 @@ class MotionEngine:
         item.setPos(solution["item_pos"])
         item.setScale(base_scale * solution["item_scale_mult"])
         item.setOpacity(item._motion_target_opacity * solution["item_opacity"])
+        base_rotation = getattr(item, '_motion_target_rotation', 0.0)
+        item.setRotation(base_rotation + solution.get("item_rotation_offset", 0.0))
         
-        # Ensure image shows 100% full pixmap (no vector draw mask)
+        # Ensure item shows 100% complete content (no progressive draw clipping during motion)
         if hasattr(item, 'set_progress'):
-            item.set_progress(1.0)
+            is_image = "AnimatedImageItem" in item.__class__.__name__ or "SVGCanvasItem" in item.__class__.__name__ or "WriteTo" in item.__class__.__name__ or "MindMap" in item.__class__.__name__
+            item.set_progress(1.0 if is_image else 2.0)
 
         # 2. Apply hand state
         if hand_item:
@@ -99,12 +110,12 @@ class MotionEngine:
                     
                 from core.settings_manager import SettingsManager
                 try:
-                    drag_hand_size = float(SettingsManager().get("drag_hand_size", 1.0))
+                    drag_hand_size = float(SettingsManager().get("drag_hand_size", 2.2))
                 except (ValueError, TypeError):
-                    drag_hand_size = 1.0
+                    drag_hand_size = 2.2
                     
-                # Balanced natural scale: proportioned relative to the item scale
-                proportional_factor = max(0.5, min(2.5, base_scale))
+                # Balanced natural scale: proportioned safely relative to the item scale
+                proportional_factor = max(0.80, min(1.30, base_scale))
                 hand_item.setScale(drag_hand_size * proportional_factor)
                 hand_item.setPos(solution["hand_pos"])
             else:
@@ -112,4 +123,4 @@ class MotionEngine:
                 if hasattr(hand_item, 'set_ink_active'):
                     hand_item.set_ink_active(False)
 
-        return True
+        return solution

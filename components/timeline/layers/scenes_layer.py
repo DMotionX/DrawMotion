@@ -39,6 +39,63 @@ class SceneDraggableBlock(DraggableBlock):
             except Exception:
                 pass
 
+    def contextMenuEvent(self, event):
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background-color: #222A27; color: white; border: 1px solid #2E8B57; padding: 4px; } "
+            "QMenu::item { padding: 6px 24px 6px 10px; border-radius: 4px; } "
+            "QMenu::item:selected { background-color: #2E8B57; } "
+            "QMenu::separator { height: 1px; background: #3E4B45; margin: 4px 0px; }"
+        )
+        
+        preview_action = menu.addAction("▶ Preview This Scene")
+        focus_action = menu.addAction("Focus on Scene Canvas")
+        menu.addSeparator()
+        
+        add_action = menu.addAction("Add Scene")
+        delete_scene_action = menu.addAction("Delete Scene")
+        menu.addSeparator()
+        
+        trans_menu = menu.addMenu("Transition Effect")
+        trans_menu.setStyleSheet(menu.styleSheet())
+        t_fade = trans_menu.addAction("Fade")
+        t_slide = trans_menu.addAction("Slide")
+        t_wipe = trans_menu.addAction("Wipe")
+        t_zoom = trans_menu.addAction("Zoom")
+        t_iris = trans_menu.addAction("Iris")
+        t_none = trans_menu.addAction("None")
+        
+        action = menu.exec_(event.globalPos())
+        if not action:
+            return
+            
+        if action == preview_action:
+            if self._workspace and hasattr(self._workspace, 'play_scene_animation'):
+                start_t = self.data.get('start', 0.0) if self.data else 0.0
+                dur_t = self.data.get('duration', 8.0) if self.data else 8.0
+                self._workspace.play_scene_animation(self._scene_index, start_t, dur_t)
+        elif action == focus_action:
+            if self._workspace:
+                try:
+                    self._workspace.focus_on_artboard(self._scene_index)
+                except Exception:
+                    pass
+        elif action == add_action:
+            if self._workspace and hasattr(self._workspace, 'add_new_scene'):
+                self._workspace.add_new_scene()
+        elif action == delete_scene_action:
+            if self._workspace and hasattr(self._workspace, 'delete_scene'):
+                self._workspace.delete_scene(self._scene_index)
+
+        elif action in (t_fade, t_slide, t_wipe, t_zoom, t_iris, t_none):
+            target_board = self.item or (self._workspace.artboards[self._scene_index] if self._workspace and 0 <= self._scene_index < len(self._workspace.artboards) else None)
+            if target_board:
+                val = action.text().lower()
+                target_board.transition_type = None if val == "none" else val
+                if self._workspace:
+                    self._workspace.items_changed.emit(self._workspace.user_items)
+
 class ScenesLayerRow(BaseLayerRow):
     LABEL_TEXT   = "Scene"
     ACCENT_COLOR = "#2E8B57"

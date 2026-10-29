@@ -365,7 +365,7 @@ class InspectorPanel(QFrame):
         
         self.entrance_mode_cb = QComboBox()
         self.entrance_mode_cb.addItem("Draw with Pen", "draw")
-        self.entrance_mode_cb.addItem("Hand Placement & Motion", "motion")
+        self.entrance_mode_cb.addItem("Hand Placement & Motion (Beta)", "motion")
         self.entrance_mode_cb.currentIndexChanged.connect(self._apply_entrance_mode)
         entrance_layout.addWidget(self.entrance_mode_cb)
         scroll_layout.addWidget(self.entrance_mode_container)
@@ -379,24 +379,37 @@ class InspectorPanel(QFrame):
         motion_layout.addWidget(self._create_section_label("Motion Style"))
         self.motion_style_cb = QComboBox()
         self.motion_style_cb.addItem("Hand Drag & Place", "hand_drag")
+        self.motion_style_cb.addItem("Hand Push & Slide", "hand_push")
         self.motion_style_cb.addItem("Directional Slide-In", "slide")
+        self.motion_style_cb.addItem("Gravity Drop & Bounce", "gravity_drop")
         self.motion_style_cb.addItem("Elastic Pop & Scale", "elastic_pop")
+        self.motion_style_cb.addItem("3D Flip Card", "flip_3d")
+        self.motion_style_cb.addItem("Cinematic Zoom", "cinematic_zoom")
+        self.motion_style_cb.addItem("Arc Glide", "arc_glide")
         self.motion_style_cb.currentIndexChanged.connect(self._apply_motion_settings)
         motion_layout.addWidget(self.motion_style_cb)
         
-        motion_layout.addWidget(self._create_section_label("Entrance Direction"))
+        self.motion_dir_lbl = self._create_section_label("Entrance Direction")
+        motion_layout.addWidget(self.motion_dir_lbl)
         self.motion_dir_cb = QComboBox()
         self.motion_dir_cb.addItem("From Left", "left")
         self.motion_dir_cb.addItem("From Right", "right")
         self.motion_dir_cb.addItem("From Top", "top")
         self.motion_dir_cb.addItem("From Bottom", "bottom")
+        self.motion_dir_cb.addItem("From Top-Left", "top_left")
+        self.motion_dir_cb.addItem("From Top-Right", "top_right")
+        self.motion_dir_cb.addItem("From Bottom-Left", "bottom_left")
+        self.motion_dir_cb.addItem("From Bottom-Right", "bottom_right")
         self.motion_dir_cb.currentIndexChanged.connect(self._apply_motion_settings)
         motion_layout.addWidget(self.motion_dir_cb)
         
         motion_layout.addWidget(self._create_section_label("Motion Easing"))
         self.motion_easing_cb = QComboBox()
-        self.motion_easing_cb.addItem("Smooth", "smooth")
-        self.motion_easing_cb.addItem("Elastic Bounce", "elastic")
+        self.motion_easing_cb.addItem("Smooth (Hermite)", "smooth")
+        self.motion_easing_cb.addItem("Back (Overshoot)", "back")
+        self.motion_easing_cb.addItem("Bounce (Physical)", "bounce")
+        self.motion_easing_cb.addItem("Elastic (Spring)", "elastic")
+        self.motion_easing_cb.addItem("Exponential", "exponential")
         self.motion_easing_cb.addItem("Linear", "linear")
         self.motion_easing_cb.currentIndexChanged.connect(self._apply_motion_settings)
         motion_layout.addWidget(self.motion_easing_cb)
@@ -404,7 +417,7 @@ class InspectorPanel(QFrame):
         motion_layout.addWidget(self._create_section_label("Motion Speed / Duration"))
         dur_box = QHBoxLayout()
         self.motion_dur_slider = QSlider(Qt.Orientation.Horizontal)
-        self.motion_dur_slider.setRange(5, 30)
+        self.motion_dur_slider.setRange(5, 40)
         self.motion_dur_slider.setValue(15)
         self.motion_dur_slider.valueChanged.connect(self._apply_motion_settings)
         dur_box.addWidget(self.motion_dur_slider)
@@ -413,6 +426,40 @@ class InspectorPanel(QFrame):
         self.motion_dur_lbl.setStyleSheet(f"color: {THEME_COLORS['text_primary']}; font-size: 11px; min-width: 35px;")
         dur_box.addWidget(self.motion_dur_lbl)
         motion_layout.addLayout(dur_box)
+
+        # Motion Sound FX (Air Whoosh / Wood Drop Thud / Pop)
+        motion_layout.addWidget(self._create_section_label("Motion Sound Effect"))
+        self.motion_sfx_cb = QComboBox()
+        self.motion_sfx_cb.addItem("None (Silent)", "none")
+        self.motion_sfx_cb.addItem("Air Whoosh", "whoosh")
+        self.motion_sfx_cb.addItem("Wood Drop Thud", "thud")
+        self.motion_sfx_cb.addItem("Pop Bubble", "pop")
+        self.motion_sfx_cb.currentIndexChanged.connect(self._apply_motion_settings)
+        motion_layout.addWidget(self.motion_sfx_cb)
+
+        # Quick Test Button
+        self.test_motion_btn = QPushButton("▶  Test Motion Preview")
+        self.test_motion_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A241F;
+                color: #3FA36D;
+                border: 1px solid #2E8B57;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 7px 12px;
+            }
+            QPushButton:hover {
+                background-color: #24352B;
+                color: #56C98B;
+                border: 1px solid #3FA36D;
+            }
+            QPushButton:pressed {
+                background-color: #16241C;
+            }
+        """)
+        self.test_motion_btn.clicked.connect(self._test_motion_preview)
+        motion_layout.addWidget(self.test_motion_btn)
         
         self.motion_engine_container.hide()
         scroll_layout.addWidget(self.motion_engine_container)
@@ -516,6 +563,7 @@ class InspectorPanel(QFrame):
         self.text_effects_container = QWidget()
         effects_layout = QVBoxLayout(self.text_effects_container)
         effects_layout.setContentsMargins(0, 0, 0, 0)
+        effects_layout.setSpacing(6)
         effects_layout.addWidget(self._create_section_label("Text Effects"))
         self.effect_combo = QComboBox()
         
@@ -533,7 +581,41 @@ class InspectorPanel(QFrame):
         self.effect_combo.addItems(list(self.effect_map.keys()))
         self.effect_combo.currentTextChanged.connect(self._apply_text_effect)
         effects_layout.addWidget(self.effect_combo)
+
         scroll_layout.addWidget(self.text_effects_container)
+        
+        # Dedicated Handwriting Pen (Write Engine)
+        self.handwriting_pen_container = QWidget()
+        hw_layout = QVBoxLayout(self.handwriting_pen_container)
+        hw_layout.setContentsMargins(0, 0, 0, 0)
+        hw_layout.setSpacing(10)
+
+        hw_layout.addWidget(self._create_section_label("Handwriting Hand"))
+        self.hw_hand_combo = QComboBox()
+        self.hw_hand_combo.addItem("Right Hand", "right")
+        self.hw_hand_combo.addItem("Left Hand", "left")
+        self.hw_hand_combo.currentIndexChanged.connect(self._on_hw_hand_type_changed)
+        hw_layout.addWidget(self.hw_hand_combo)
+
+        hw_layout.addWidget(self._create_section_label("Pen Model & Style"))
+        self.hw_style_combo = QComboBox()
+        self.hw_style_combo.currentIndexChanged.connect(self._on_hw_style_changed)
+        hw_layout.addWidget(self.hw_style_combo)
+
+        hw_layout.addWidget(self._create_section_label("Writing Hand Size"))
+        hw_size_layout = QHBoxLayout()
+        self.hw_size_slider = QSlider(Qt.Orientation.Horizontal)
+        self.hw_size_slider.setRange(5, 20)  # 0.5x to 2.0x
+        self.hw_size_slider.setValue(10)
+        self.hw_size_slider.valueChanged.connect(self._on_hw_size_changed)
+
+        self.hw_size_lbl = QLabel("1.0x")
+        self.hw_size_lbl.setStyleSheet(f"color: {THEME_COLORS['primary_green']}; font-weight: bold; min-width: 40px;")
+        hw_size_layout.addWidget(self.hw_size_slider)
+        hw_size_layout.addWidget(self.hw_size_lbl)
+        hw_layout.addLayout(hw_size_layout)
+
+        scroll_layout.addWidget(self.handwriting_pen_container)
         
         scroll_layout.addStretch(1)
         
@@ -552,6 +634,10 @@ class InspectorPanel(QFrame):
         self.current_item = item
         if not item:
             self.stack.setCurrentWidget(self.no_selection_page)
+            if hasattr(self, 'handwriting_pen_container'):
+                self.hw_hand_combo.setEnabled(False)
+                self.hw_style_combo.setEnabled(False)
+                self.hw_size_slider.setEnabled(False)
             return
             
         self.stack.setCurrentWidget(self.properties_page)
@@ -593,9 +679,16 @@ class InspectorPanel(QFrame):
             self.entrance_mode_container.hide()
             self.motion_engine_container.hide()
             self.drawing_engine_container.hide()
+            if hasattr(self, 'library_engine_container'):
+                self.library_engine_container.hide()
             self.sfx_container.hide()
             self.physics_algo_container.show()
             self.text_effects_container.show()
+            if hasattr(self, 'handwriting_pen_container'):
+                self.handwriting_pen_container.show()
+                self.hw_hand_combo.setEnabled(True)
+                self.hw_style_combo.setEnabled(True)
+                self.hw_size_slider.setEnabled(True)
             
         else:
             # Show ONLY Image tabs
@@ -613,6 +706,11 @@ class InspectorPanel(QFrame):
             self.sfx_container.show()
             self.physics_algo_container.hide()
             self.text_effects_container.hide()
+            if hasattr(self, 'handwriting_pen_container'):
+                self.handwriting_pen_container.hide()
+                self.hw_hand_combo.setEnabled(False)
+                self.hw_style_combo.setEnabled(False)
+                self.hw_size_slider.setEnabled(False)
 
             has_entrance = hasattr(item, 'entrance_mode') or hasattr(item, 'motion_settings')
             if has_entrance:
@@ -662,6 +760,7 @@ class InspectorPanel(QFrame):
         self.motion_dir_cb.blockSignals(True)
         self.motion_easing_cb.blockSignals(True)
         self.motion_dur_slider.blockSignals(True)
+        self.motion_sfx_cb.blockSignals(True)
         self.drawing_style_cb.blockSignals(True)
         if hasattr(self, 'drawing_direction_cb'):
             self.drawing_direction_cb.blockSignals(True)
@@ -780,6 +879,17 @@ class InspectorPanel(QFrame):
         else:
             self.effect_combo.setEnabled(False)
             
+        # Update Handwriting Pen Settings
+        if is_text_item and hasattr(self, 'handwriting_pen_container'):
+            self.hw_hand_combo.setEnabled(True)
+            self.hw_style_combo.setEnabled(True)
+            self.hw_size_slider.setEnabled(True)
+            self._update_hw_pen_ui_from_item(item)
+        elif hasattr(self, 'handwriting_pen_container'):
+            self.hw_hand_combo.setEnabled(False)
+            self.hw_style_combo.setEnabled(False)
+            self.hw_size_slider.setEnabled(False)
+            
         # Update Entrance & Motion fields
         if hasattr(item, 'entrance_mode'):
             idx = self.entrance_mode_cb.findData(item.entrance_mode)
@@ -794,6 +904,7 @@ class InspectorPanel(QFrame):
             m_dir = m_settings.get("direction", "left")
             m_easing = m_settings.get("easing", "smooth")
             m_dur = float(m_settings.get("duration", 1.5))
+            m_sfx = m_settings.get("sfx", "none")
             
             idx = self.motion_style_cb.findData(m_style)
             if idx >= 0: self.motion_style_cb.setCurrentIndex(idx)
@@ -803,11 +914,14 @@ class InspectorPanel(QFrame):
             
             idx = self.motion_easing_cb.findData(m_easing)
             if idx >= 0: self.motion_easing_cb.setCurrentIndex(idx)
+
+            idx = self.motion_sfx_cb.findData(m_sfx)
+            if idx >= 0: self.motion_sfx_cb.setCurrentIndex(idx)
             
             slider_val = int(round(m_dur * 10))
-            self.motion_dur_slider.setValue(max(5, min(30, slider_val)))
+            self.motion_dur_slider.setValue(max(5, min(40, slider_val)))
             self.motion_dur_lbl.setText(f"{m_dur:.1f}s")
-            self.motion_dir_cb.setEnabled(m_style != "elastic_pop")
+            self.motion_dir_cb.setEnabled(m_style not in ("elastic_pop", "flip_3d", "gravity_drop"))
 
         # Unblock combo signals
         self.entrance_mode_cb.blockSignals(False)
@@ -815,6 +929,7 @@ class InspectorPanel(QFrame):
         self.motion_dir_cb.blockSignals(False)
         self.motion_easing_cb.blockSignals(False)
         self.motion_dur_slider.blockSignals(False)
+        self.motion_sfx_cb.blockSignals(False)
         self.drawing_style_cb.blockSignals(False)
         if hasattr(self, 'drawing_direction_cb'):
             self.drawing_direction_cb.blockSignals(False)
@@ -839,7 +954,7 @@ class InspectorPanel(QFrame):
                 self.library_engine_container.hide()
             self.motion_engine_container.show()
             style = self.motion_style_cb.currentData() or "hand_drag"
-            self.motion_dir_cb.setEnabled(style != "elastic_pop")
+            self.motion_dir_cb.setEnabled(style not in ("elastic_pop", "flip_3d", "gravity_drop"))
         else:
             self.drawing_engine_container.show()
             if hasattr(self, 'library_engine_container'):
@@ -853,18 +968,26 @@ class InspectorPanel(QFrame):
         style = self.motion_style_cb.currentData() or "hand_drag"
         direction = self.motion_dir_cb.currentData() or "left"
         easing = self.motion_easing_cb.currentData() or "smooth"
+        sfx = self.motion_sfx_cb.currentData() or "none"
         dur_sec = round(self.motion_dur_slider.value() / 10.0, 1)
         self.motion_dur_lbl.setText(f"{dur_sec}s")
         
-        self.motion_dir_cb.setEnabled(style != "elastic_pop")
+        self.motion_dir_cb.setEnabled(style not in ("elastic_pop", "flip_3d", "gravity_drop"))
         
         self.current_item.motion_settings = {
             "style": style,
             "direction": direction,
             "duration": dur_sec,
-            "easing": easing
+            "easing": easing,
+            "sfx": sfx
         }
         self.item_modified.emit()
+
+    def _test_motion_preview(self):
+        if not self.current_item:
+            return
+        if self.workspace and hasattr(self.workspace, "preview_item_motion"):
+            self.workspace.preview_item_motion(self.current_item)
             
             
     def _apply_drawing_style(self, text):
@@ -931,12 +1054,12 @@ class InspectorPanel(QFrame):
         
         # Translate from UI friendly name to internal ID
         internal_id = getattr(self, 'effect_map', {}).get(text, "none")
-        
         if hasattr(self.current_item.model, 'text_effect'):
-            self.current_item.model.text_effect = internal_id
-            if hasattr(self.current_item, 'update_text_properties'):
-                self.current_item.update_text_properties()
-            self.item_modified.emit()
+            if self.current_item.model.text_effect != internal_id:
+                self.current_item.model.text_effect = internal_id
+                if hasattr(self.current_item, 'update_text_properties'):
+                    self.current_item.update_text_properties()
+                self.item_modified.emit()
 
     def _apply_transform(self):
         if not self.current_item: return
@@ -1080,3 +1203,78 @@ class InspectorPanel(QFrame):
                     
             # Trigger timeline refresh
             scene.items_changed.emit(scene.user_items)
+
+    def _refresh_hw_styles_combo(self, hand_type: str, selected_sid: str = None):
+        from components.write_to_image.hand_catalog import WritingHandCatalog
+        self.hw_style_combo.blockSignals(True)
+        self.hw_style_combo.clear()
+        styles = WritingHandCatalog.get_available_styles(hand_type)
+        for sid, name in styles:
+            self.hw_style_combo.addItem(name, sid)
+        
+        if selected_sid:
+            idx = self.hw_style_combo.findData(selected_sid)
+            if idx >= 0:
+                self.hw_style_combo.setCurrentIndex(idx)
+        self.hw_style_combo.blockSignals(False)
+
+    def _update_hw_pen_ui_from_item(self, item):
+        from core.settings_manager import SettingsManager
+        self.hw_hand_combo.setEnabled(True)
+        self.hw_style_combo.setEnabled(True)
+        self.hw_size_slider.setEnabled(True)
+        sm = SettingsManager()
+        model = getattr(item, 'model', None)
+
+        ht = getattr(model, 'writing_hand_type', None) or sm.get("writing_hand_type", "right")
+        sid = getattr(model, 'writing_hand_style', None) or sm.get("writing_hand_style", "default")
+        sz = getattr(model, 'writing_hand_size', None)
+        if sz is None:
+            sz = float(sm.get("writing_hand_size", 1.0))
+        else:
+            sz = float(sz)
+
+        self.hw_hand_combo.blockSignals(True)
+        ht_idx = self.hw_hand_combo.findData(ht)
+        if ht_idx >= 0:
+            self.hw_hand_combo.setCurrentIndex(ht_idx)
+        self.hw_hand_combo.blockSignals(False)
+
+        self._refresh_hw_styles_combo(ht, selected_sid=sid)
+
+        self.hw_size_slider.blockSignals(True)
+        slider_val = int(round(sz * 10))
+        slider_val = max(5, min(slider_val, 20))
+        self.hw_size_slider.setValue(slider_val)
+        self.hw_size_lbl.setText(f"{sz:.1f}x")
+        self.hw_size_slider.blockSignals(False)
+
+    def _on_hw_hand_type_changed(self, index):
+        from core.settings_manager import SettingsManager
+        new_ht = self.hw_hand_combo.currentData()
+        if not new_ht: return
+        SettingsManager().set("writing_hand_type", new_ht)
+        self._refresh_hw_styles_combo(new_ht)
+        if self.current_item and hasattr(self.current_item, 'model'):
+            self.current_item.model.writing_hand_type = new_ht
+            cur_sid = self.hw_style_combo.currentData() or "default"
+            self.current_item.model.writing_hand_style = cur_sid
+            self.item_modified.emit()
+
+    def _on_hw_style_changed(self, index):
+        from core.settings_manager import SettingsManager
+        new_sid = self.hw_style_combo.currentData()
+        if not new_sid: return
+        SettingsManager().set("writing_hand_style", new_sid)
+        if self.current_item and hasattr(self.current_item, 'model'):
+            self.current_item.model.writing_hand_style = new_sid
+            self.item_modified.emit()
+
+    def _on_hw_size_changed(self, value):
+        from core.settings_manager import SettingsManager
+        fval = value / 10.0
+        self.hw_size_lbl.setText(f"{fval:.1f}x")
+        SettingsManager().set("writing_hand_size", fval)
+        if self.current_item and hasattr(self.current_item, 'model'):
+            self.current_item.model.writing_hand_size = fval
+            self.item_modified.emit()

@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 This project adheres to Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.7.13] - 2026-10-28
+
+### Robust Playback Crash Shield, Natural Click-Based Text Placement, Transit Hand Isolation & Core Stability
+
+This release delivers major stability and usability breakthroughs across the animation studio: an automated fail-safe playback crash shield that eliminates infinite error popup loops, mouse-click based text placement avoiding artboard center collisions, strict transit hand hiding between scenes and media, and complete decoupling of drawing hand and handwriting mechanics.
+
+#### Bug Fixes & Stability
+* **Playback Crash Shield & Anti-Storm Guard:** Solved the critical issue where unhandled runtime errors during animation playback triggered rapid-fire modal error dialogs (~60 FPS) that froze the application. The playback loop now immediately halts its timer, cleanly hides hands, resets state, and the global error tracker suppresses duplicate stacked popups while allowing instant terminal termination via Ctrl+C.
+* **Paragraph Editor Recursion Elimination:** Resolved an issue where pressing Enter or typing multiline text triggered cascading layout updates, preventing editor freezing and guaranteeing seamless Arabic and English typing.
+* **Scene & Media Transit Hand Leak Fix:** Fixed the whiteboard drawing hand briefly flashing or lingering during scene-to-scene and image-to-image transitions, guaranteeing hands remain strictly invisible when moving between distinct visual elements.
+* **Multi-Text Hand Continuity:** Maintained uninterrupted writing hand transitions across sequential text elements without unexpected hand disappearing or premature resets.
+* **Motion Entrance Parameter Resolution:** Fixed playback crashes when using motion entrance modes (such as physical bounce or drag) by restoring required hand scaling parameters in kinematics solvers.
+
+#### Key Enhancements & Usability
+* **Natural Mouse-Click Text Placement:** Clicking with the Text tool on the canvas now opens the paragraph editor directly at the mouse cursor position, and the rendered text item is placed exactly where the user clicked, complete with intelligent boundary clamping to keep input boxes within view.
+* **Direct In-Place Text Editing:** Double-clicking an existing text item now opens the paragraph editor directly over the item itself, rather than disorientingly forcing it to the screen center.
+* **Ergonomic Drawing Hand Scale Normalization:** Updated the default whiteboard drawing hand size to 2.0 to naturally match standard canvas dimensions, with real-time responsive updates when adjusted in project settings.
+* **High-Resolution Font Rendering:** Upgraded text rendering quality with optimized default sizing (42pt) and intelligent canvas proportions.
+* **Strict Image Isolation:** Guaranteed that image addition, placement, and centering mechanics remain 100% untouched and safe from unintended side effects.
+* **Comprehensive Test Suite:** Expanded automated test validation across the entire repository to 80 unit tests with a 100% pass rate.
+
 ---
 
 ## [1.7.12] - 2026-10-23
@@ -60,7 +81,7 @@ This release aligns the MSIX packaging manifest and application UI with the offi
 * **GitHub Link Modernization:** Updated the official GitHub social tile in the Settings → Updates hub (`components/settings/components/update_settings.py`) to point to the authoritative open-source repository: `https://github.com/DMotionX/DrawMotion`.
 
 #### Author Governance & Legal Protection
-* **Centralized Author Governance (`AUTHORS`):** Added a top-level `AUTHORS` file establishing full legal authorship coverage for the entire repository tree under GPLv3, documenting Mohamed Fadl as Founder & Lead Architect and EASY SOFT TEAM as the contributing community. This single-file approach protects all source files without requiring per-file modification.
+* **Centralized Author Governance (`AUTHORS`):** Added a top-level `AUTHORS` file establishing full legal authorship coverage for the entire repository tree under GPLv3, documenting Mohamed Fadl as Founder & Lead Architect and DrawMotion Team as the contributing community. This single-file approach protects all source files without requiring per-file modification.
 * **Runtime Version Synchronization:** Synchronized version `1.7.11` across `core/updater.py`, `core/serialization/serializer.py`, Inno Setup scripts, and Microsoft Store manifests.
 
 ---

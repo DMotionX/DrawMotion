@@ -27,9 +27,9 @@ OFFICIAL_LINKS = [
     },
     {
         "title": "Facebook",
-        "subtitle": "EASY SOFT Team Official",
+        "subtitle": "DrawMotion Team Official",
         "icon": "facebook",
-        "url": "https://www.facebook.com/profile.php?id=61592234934862&locale=ar_AR"
+        "url": "https://www.facebook.com/profile.php?id=61595676097302"
     },
     {
         "title": "Official Website",
@@ -217,10 +217,10 @@ class UpdateSettings(SettingsSection):
         self.whats_new_btn.clicked.connect(self._show_whats_new)
         action_row.addWidget(self.whats_new_btn)
 
-        # Rollback Button (Available if a previous installer exists in vault)
-        from core.recovery_engine.watchdog import get_previous_installer_info
-        prev_ver, prev_inst = get_previous_installer_info()
-        if prev_ver and prev_inst:
+        # Rollback Button (Available ONLY if a strictly older installer exists in vault)
+        from core.recovery_engine.watchdog import get_previous_installer_info, is_strictly_older
+        prev_ver, prev_inst = get_previous_installer_info(CURRENT_VERSION)
+        if prev_ver and prev_inst and is_strictly_older(prev_ver, CURRENT_VERSION):
             self.rollback_btn = QPushButton(f"Rollback to v{prev_ver}")
             self.rollback_btn.setIcon(get_icon("download", "#E57373"))
             self.rollback_btn.setIconSize(QSize(16, 16))
@@ -249,10 +249,10 @@ class UpdateSettings(SettingsSection):
         action_row.addStretch()
         card1.addLayout(action_row)
 
-        # ── Card 2: Creators & Leadership (EASY SOFT) ───────────────────────
-        card2 = self.begin_card("About EASY SOFT & Authors")
+        # ── Card 2: Creators & Leadership (DrawMotion Team) ─────────────────
+        card2 = self.begin_card("About DrawMotion Team & Authors")
         
-        team_title = QLabel("EASY SOFT Team")
+        team_title = QLabel("DrawMotion Team")
         team_title.setStyleSheet("color: #3FA36D; font-size: 16px; font-weight: bold; background: transparent; border: none;")
         card2.addWidget(team_title)
         

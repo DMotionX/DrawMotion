@@ -71,6 +71,15 @@ class ThumbnailEngine(QObject):
         self.worker.thumbnail_ready.connect(self._on_thumbnail_ready)
         
         self.thread.start()
+
+        # Ensure thread is cleanly terminated upon application quit
+        from PySide6.QtCore import QCoreApplication
+        app = QCoreApplication.instance()
+        if app:
+            app.aboutToQuit.connect(self.shutdown)
+        import atexit
+        atexit.register(self.shutdown)
+
         
     @classmethod
     def get_instance(cls):
@@ -144,7 +153,9 @@ class ThumbnailEngine(QObject):
         try:
             if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
                 self.thread.quit()
-                self.thread.wait(500)
+                if not self.thread.wait(500):
+                    self.thread.terminate()
+                    self.thread.wait(200)
         except Exception:
             pass
 

@@ -53,13 +53,26 @@ jobs:
 
       - name: Build Standalone with Nuitka
         run: |
-          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --include-data-dir="components/project_hub/qml=components/project_hub/qml" --include-data-dir="components/write_to_image/effects/qml=components/write_to_image/effects/qml" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
 
       - name: Stage MSIX Layout
         run: |
           New-Item -ItemType Directory -Path "msix_staging" -Force
           $distDir = if (Test-Path "dist\main.dist") { "dist\main.dist" } elseif (Test-Path "dist\DrawMotion.dist") { "dist\DrawMotion.dist" } else { "dist\DrawMotion" }
           Copy-Item -Recurse "$distDir\*" "msix_staging\"
+
+          # Bundle PySide6 QML runtime modules for MSIX
+          $pysideDir = (python -c "import PySide6, os; print(os.path.dirname(PySide6.__file__))")
+          $pysideQml = Join-Path $pysideDir "qml"
+          if (Test-Path $pysideQml) {
+            New-Item -ItemType Directory -Path "msix_staging\PySide6\qml" -Force | Out-Null
+            Copy-Item -Recurse -Force "$pysideQml\*" "msix_staging\PySide6\qml\"
+          }
+          Copy-Item -Force "$pysideDir\Qt6QuickControls2*.dll" "msix_staging\"
+          Copy-Item -Force "$pysideDir\Qt6QuickLayouts*.dll" "msix_staging\"
+          Copy-Item -Force "$pysideDir\Qt6QuickShapes*.dll" "msix_staging\"
+          Copy-Item -Force "$pysideDir\Qt6QmlCore*.dll" "msix_staging\"
+
           Copy-Item "build_assets\msstore\AppxManifest.xml" "msix_staging\"
           if (-not (Test-Path "msix_staging\Assets")) {
             New-Item -ItemType Directory -Path "msix_staging\Assets" -Force
@@ -67,7 +80,7 @@ jobs:
           Copy-Item -Path "build_assets\msstore\Assets\*" -Destination "msix_staging\Assets\" -Recurse -Force
 
           # Sync version into manifest safely preserving <?xml version="1.0" encoding="utf-8"?>
-          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.11" }
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.13" }
           $parts = $tag.Split('.')
           while ($parts.Length -lt 4) { $parts += "0" }
           $quadVersion = $parts -join '.'

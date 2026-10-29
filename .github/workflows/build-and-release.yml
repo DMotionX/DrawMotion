@@ -56,9 +56,29 @@ jobs:
 
       - name: Build with Nuitka (Diagnostic Mode)
         run: |
-          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=force --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=force --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --include-data-dir="components/project_hub/qml=components/project_hub/qml" --include-data-dir="components/write_to_image/effects/qml=components/write_to_image/effects/qml" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
           if (Test-Path "dist\main.dist") { Rename-Item -Path "dist\main.dist" -NewName "DrawMotion" }
           elseif (Test-Path "dist\DrawMotion.dist") { Rename-Item -Path "dist\DrawMotion.dist" -NewName "DrawMotion" }
+
+          # Bundle QML assets and PySide6 QML runtime modules
+          $pysideDir = (python -c "import PySide6, os; print(os.path.dirname(PySide6.__file__))")
+          $pysideQml = Join-Path $pysideDir "qml"
+          if (Test-Path $pysideQml) {
+            New-Item -ItemType Directory -Path "dist\DrawMotion\PySide6\qml" -Force | Out-Null
+            Copy-Item -Recurse -Force "$pysideQml\*" "dist\DrawMotion\PySide6\qml\"
+            Write-Host "PySide6 QML runtime modules bundled successfully."
+          }
+          if (Test-Path "components\project_hub\qml") {
+            New-Item -ItemType Directory -Path "dist\DrawMotion\components\project_hub\qml" -Force | Out-Null
+            Copy-Item -Recurse -Force "components\project_hub\qml\*" "dist\DrawMotion\components\project_hub\qml\"
+          }
+          # Copy Qt6 QuickControls2 and Layouts runtime DLLs into application root
+          Copy-Item -Force "$pysideDir\Qt6QuickControls2*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QuickLayouts*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QuickShapes*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QmlCore*.dll" "dist\DrawMotion\"
+          Write-Host "Qt6 QuickControls2 and Layouts runtime DLLs bundled into application root."
+
           Copy-Item -Force "build_assets\Debug_DrawMotion.bat" "dist\DrawMotion\Debug_DrawMotion.bat"
           Compress-Archive -Path "dist\DrawMotion" -DestinationPath "dist\DrawMotion_DeveloperEdition.zip"
 
@@ -116,13 +136,32 @@ jobs:
 
       - name: Build with Nuitka (Production Mode)
         run: |
-          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
+          python -m nuitka --standalone --plugin-enable=pyside6 --include-qt-plugins=sensible,multimedia,imageformats,iconengines --assume-yes-for-downloads --windows-icon-from-ico="resources/branding/ICO/DrawMotion.ico" --windows-console-mode=disable --include-package=components --include-package=core --include-package=advanced_features --include-package=graphics --include-package=services --include-package=asset_library --include-package=utils --include-package=models --include-data-dir="resources=resources" --include-data-dir="bin=bin" --include-data-dir="assets=assets" --include-data-dir="core/security_engine/bin=core/security_engine/bin" --include-data-dir="components/project_hub/qml=components/project_hub/qml" --include-data-dir="components/write_to_image/effects/qml=components/write_to_image/effects/qml" --nofollow-import-to=scipy --output-dir="dist" --output-filename="DrawMotion" main.py
           if (Test-Path "dist\main.dist") { Rename-Item -Path "dist\main.dist" -NewName "DrawMotion" }
           elseif (Test-Path "dist\DrawMotion.dist") { Rename-Item -Path "dist\DrawMotion.dist" -NewName "DrawMotion" }
 
+          # Bundle QML assets and PySide6 QML runtime modules before installer generation
+          $pysideDir = (python -c "import PySide6, os; print(os.path.dirname(PySide6.__file__))")
+          $pysideQml = Join-Path $pysideDir "qml"
+          if (Test-Path $pysideQml) {
+            New-Item -ItemType Directory -Path "dist\DrawMotion\PySide6\qml" -Force | Out-Null
+            Copy-Item -Recurse -Force "$pysideQml\*" "dist\DrawMotion\PySide6\qml\"
+            Write-Host "PySide6 QML runtime modules bundled successfully for setup installer."
+          }
+          if (Test-Path "components\project_hub\qml") {
+            New-Item -ItemType Directory -Path "dist\DrawMotion\components\project_hub\qml" -Force | Out-Null
+            Copy-Item -Recurse -Force "components\project_hub\qml\*" "dist\DrawMotion\components\project_hub\qml\"
+          }
+          # Copy Qt6 QuickControls2 and Layouts runtime DLLs into application root for installer
+          Copy-Item -Force "$pysideDir\Qt6QuickControls2*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QuickLayouts*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QuickShapes*.dll" "dist\DrawMotion\"
+          Copy-Item -Force "$pysideDir\Qt6QmlCore*.dll" "dist\DrawMotion\"
+          Write-Host "Qt6 QuickControls2 and Layouts runtime DLLs bundled into application root for installer."
+
       - name: Update Installer Version
         run: |
-          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.10" }
+          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.7.13" }
           (Get-Content build_assets/setup_script_github.iss) -replace '^AppVersion=.*', "AppVersion=$version" | Set-Content build_assets/setup_script_github.iss
 
       - name: Sync Legal Policies to Installer

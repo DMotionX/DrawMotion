@@ -68,7 +68,7 @@ Everything added to the project, including code, comments, commit messages, docu
 - Politics, religion, and other off-topic debates are not for project spaces.
 - Be patient. Maintainers and contributors are often volunteers.
 
-If someone's behavior is disrupting the project, please report it privately to `conduct@easysoft.dev`. Maintainers may edit or remove comments and contributions, and may limit participation, when needed to keep the project productive.
+If someone's behavior is disrupting the project, please report it privately to `easysoft.dv2team@gmail.com` *(Note: This active contact address is maintained by the DrawMotion Team during our ongoing team rebranding and infrastructure migration, and may be updated to an official domain in an upcoming release)*. Maintainers will review and investigate all reports promptly and fairly.
 
 ## Questions
 

@@ -67,9 +67,23 @@ class SmartScheduler:
                     move_start_time = current['end']
                     move_end_time = move_start_time + move_time
                     
+                    def _is_text_item(it):
+                        if it is None:
+                            return False
+                        if "WriteTo" in it.__class__.__name__:
+                            return True
+                        if hasattr(it, 'model') and getattr(it.model, 'item_type', '') == 'write_to_image':
+                            return True
+                        return False
+
+                    is_text_trans = _is_text_item(current_item_obj) and _is_text_item(next_item_obj)
+
                     final_schedule.append({
                         'type': 'move-hand',
                         'item': None,
+                        'from_item': current_item_obj,
+                        'to_item': next_item_obj,
+                        'is_text_transition': is_text_trans,
                         'from_pos': end_pos,
                         'to_pos': start_pos,
                         'start': move_start_time,

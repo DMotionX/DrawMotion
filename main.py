@@ -1,4 +1,4 @@
-# Copyright (c) 2026 Mohamed Fadl & EASY SOFT TEAM
+# Copyright (c) 2026 Mohamed Fadl & DrawMotion Team
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 Purpose: Main entry point for the DrawMotion application.
@@ -396,6 +396,7 @@ class WhiteInkMainWindow(QMainWindow):
             self.center_workspace.audio_engine.stop_all()
             
         self.center_workspace.animator_engine.finished.connect(on_animation_finished)
+        self.center_workspace.animator_engine.playback_started.connect(_update_play_state)
         self.top_bar.tool_selected.connect(self.center_workspace.set_tool_mode)
         self.center_workspace.tool_mode_changed.connect(self.top_bar.set_active_tool)
         
@@ -407,9 +408,11 @@ class WhiteInkMainWindow(QMainWindow):
         self.top_bar.undo_requested.connect(self.center_workspace.undo_stack.undo)
         self.top_bar.redo_requested.connect(self.center_workspace.undo_stack.redo)
         self.top_bar.export_btn.clicked.connect(self._start_export)
+        self.top_bar.hub_requested.connect(self._show_project_hub)
         
         # Connect Menu Bar Actions (Safe Wiring)
         self.main_menu_bar.exit_requested.connect(self.close)
+        self.main_menu_bar.projects_hub_requested.connect(self._show_project_hub)
         self.main_menu_bar.new_project_requested.connect(self._new_project_action)
         self.main_menu_bar.open_project_requested.connect(self._open_project_action)
         self.main_menu_bar.save_project_requested.connect(self._save_project_action)
@@ -564,20 +567,70 @@ class WhiteInkMainWindow(QMainWindow):
             self.center_workspace.clipboard.duplicate(item)
 
     def _new_project_action(self):
-        reply = QMessageBox.question(
-            self, "New Project",
-            "Are you sure you want to create a new project? Unsaved changes will be lost.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.center_workspace.initialize_new_project()
-            self.project_manager.workspace = self.center_workspace
-            self.current_project_filepath = None
-            if hasattr(self.project_manager, 'current_project_filepath'):
-                self.project_manager.current_project_filepath = None
-            self._update_window_title()
-            QMessageBox.information(self, "New Project", "Workspace cleared for a new project.")
+        if hasattr(self, 'center_workspace') and self.center_workspace.user_items:
+            reply = QMessageBox.question(
+                self, "New Project",
+                "Are you sure you want to create a new project? Unsaved changes will be lost.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return False
+        self.center_workspace.initialize_new_project()
+        self.project_manager.workspace = self.center_workspace
+        self.current_project_filepath = None
+        if hasattr(self.project_manager, 'current_project_filepath'):
+            self.project_manager.current_project_filepath = None
+        self._update_window_title()
+        return True
+
+    def new_project_action(self):
+        """Public alias for Project Hub integration."""
+        return self._new_project_action()
+
+    def new_project_with_preset(self, width: int = 1920, height: int = 1080) -> bool:
+        """Initializes a new project with the selected canvas preset aspect ratio and dimensions."""
+        if hasattr(self, 'center_workspace') and self.center_workspace.user_items:
+            reply = QMessageBox.question(
+                self, "New Project",
+                "Are you sure you want to create a new project? Unsaved changes will be lost.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return False
+
+        ratio_map = {
+            (1920, 1080): "16:9",
+            (1080, 1920): "9:16",
+            (1080, 1080): "1:1",
+            (1024, 768): "4:3",
+        }
+        ratio_str = ratio_map.get((width, height), "16:9")
+        self.settings_manager.set("canvas_size", ratio_str)
+
+        self.center_workspace.initialize_new_project()
+
+        for ab in self.center_workspace.artboards:
+            ab._set_aspect_ratio(width, height)
+
+        self.project_manager.workspace = self.center_workspace
+        self.current_project_filepath = None
+        if hasattr(self.project_manager, 'current_project_filepath'):
+            self.project_manager.current_project_filepath = None
+        self._update_window_title()
+        self.center_workspace.reset_zoom()
+        return True
+
+    def _show_project_hub(self):
+        """Displays the QML-based Project Hub."""
+        from components.project_hub import ProjectHubWindow
+        if not hasattr(self, '_project_hub_window') or not self._project_hub_window:
+            self._project_hub_window = ProjectHubWindow(main_window=self)
+        if self._project_hub_window.is_valid():
+            self._project_hub_window.show_hub()
+        else:
+            print("[ProjectHub] Notice: ProjectHubWindow could not initialize QML interface.")
 
     def _add_to_recent_files(self, filepath: str):
         if not filepath:
@@ -800,6 +853,26 @@ class WhiteInkMainWindow(QMainWindow):
         )
         dialog.exec()
 
+    def closeEvent(self, event):
+        """Cleanly shuts down worker threads and audio engines to prevent QThread destruction errors."""
+        try:
+            if hasattr(self, 'center_workspace') and self.center_workspace:
+                if hasattr(self.center_workspace, 'animator_engine') and self.center_workspace.animator_engine:
+                    if hasattr(self.center_workspace.animator_engine, 'shutdown'):
+                        self.center_workspace.animator_engine.shutdown()
+                    elif hasattr(self.center_workspace.animator_engine, 'stop'):
+                        self.center_workspace.animator_engine.stop()
+                if hasattr(self.center_workspace, 'audio_engine') and self.center_workspace.audio_engine:
+                    if hasattr(self.center_workspace.audio_engine, 'shutdown'):
+                        self.center_workspace.audio_engine.shutdown()
+                    elif hasattr(self.center_workspace.audio_engine, 'stop_all'):
+                        self.center_workspace.audio_engine.stop_all()
+            if hasattr(self, '_project_hub_window') and self._project_hub_window:
+                self._project_hub_window.close()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
 if __name__ == "__main__":
     import ctypes
     import sys
@@ -884,8 +957,21 @@ if __name__ == "__main__":
     from PySide6.QtCore import QLocale
     QLocale.setDefault(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 
+    # Force Qt Quick Controls style to Basic to allow complete QML styling without native warnings
+    try:
+        from PySide6.QtQuickControls2 import QQuickStyle
+        QQuickStyle.setStyle("Basic")
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     StartupLifecycleTracker.trace("QT_APP_READY", "QApplication initialized.")
+
+    # ── Instant Interactive Splash Reload Screen (<50ms response) ────────────
+    from components.splash import InteractiveSplashScreen
+    splash = InteractiveSplashScreen(version=f"v{CURRENT_VERSION}")
+    splash.show()
+    splash.set_progress(10, "Welcome to DrawMotion...")
 
     from PySide6.QtGui import QImageReader
     from PySide6.QtCore import QCoreApplication
@@ -898,8 +984,10 @@ if __name__ == "__main__":
         record_boot_start, record_boot_success, record_boot_abort, is_recovery_required, SafeRecoveryDialog
     )
     
+    splash.set_progress(25, "Preparing your creative space...")
     needs_recovery, health_state = is_recovery_required(CURRENT_VERSION)
     if needs_recovery:
+        splash.hide()
         StartupLifecycleTracker.trace("WATCHDOG_RECOVERY", f"Interventions triggered (attempts={health_state.get('boot_attempts', 0)})")
         rec_dlg = SafeRecoveryDialog(CURRENT_VERSION)
         code = rec_dlg.exec()
@@ -911,12 +999,14 @@ if __name__ == "__main__":
         else:
             # Dismissed or continue: clear failure count and continue normal startup
             record_boot_success(CURRENT_VERSION)
+        splash.show()
 
     # Record boot start attempt
     record_boot_start(CURRENT_VERSION)
     StartupLifecycleTracker.trace("BOOT_ATTEMPT_RECORDED", "Watchdog marked starting.")
     # ────────────────────────────────────────────────────────────────────────
     
+    splash.set_progress(45, "Getting colors & templates ready...")
     # Initialize the Smart Error Tracker
     from core.error_handler.tracker import GlobalErrorTracker
     GlobalErrorTracker.initialize()
@@ -935,12 +1025,23 @@ if __name__ == "__main__":
     # Apply global stylesheet
     app.setStyleSheet(get_global_qss())
 
+    splash.set_progress(65, "Setting up tools & brushes...")
     StartupLifecycleTracker.trace("UI_CREATING", "Instantiating WhiteInkMainWindow...")
     window = WhiteInkMainWindow()
     StartupLifecycleTracker.trace("UI_CREATED", "WhiteInkMainWindow created successfully.")
 
-    window.showMaximized()
-    StartupLifecycleTracker.trace("UI_DISPLAYED", "Main window rendered and maximized.")
+    splash.set_progress(90, "Opening your projects...")
+    # Launch into Project Hub Welcome Screen
+    from components.project_hub import ProjectHubWindow
+    hub_window = ProjectHubWindow(main_window=window)
+    window._project_hub_window = hub_window
+
+    if hub_window.is_valid():
+        splash.finish_smoothly(hub_window)
+        StartupLifecycleTracker.trace("HUB_DISPLAYED", "Project Hub rendered on startup.")
+    else:
+        splash.finish_smoothly(window)
+        StartupLifecycleTracker.trace("UI_DISPLAYED", "Main window rendered and maximized.")
 
     # Mark boot as successful immediately once the main window is rendered
     record_boot_success(CURRENT_VERSION)

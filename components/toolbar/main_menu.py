@@ -10,6 +10,7 @@ class MenuSignalBridge(QObject):
     Zero emojis, 100% backward-compatible.
     """
     # --- Signals for File Menu ---
+    projects_hub_requested = Signal()
     new_project_requested = Signal()
     open_project_requested = Signal()
     save_project_requested = Signal()
@@ -70,6 +71,7 @@ class WhiteInkMenuBar(QObject):
         self.bridge = MenuSignalBridge(self)
 
         # Expose all signals directly on WhiteInkMenuBar for 100% backward compatibility
+        self.projects_hub_requested = self.bridge.projects_hub_requested
         self.new_project_requested = self.bridge.new_project_requested
         self.open_project_requested = self.bridge.open_project_requested
         self.save_project_requested = self.bridge.save_project_requested
@@ -181,6 +183,8 @@ class WhiteInkMenuBar(QObject):
     def _build_file_menu(self):
         file_menu = self.addMenu("&File")
 
+        self._add_action(file_menu, "Projects Hub...", "Ctrl+H", self.projects_hub_requested)
+        file_menu.addSeparator()
         self._add_action(file_menu, "New Project", "Ctrl+N", self.new_project_requested)
         self._add_action(file_menu, "Open Project", "Ctrl+O", self.open_project_requested)
         

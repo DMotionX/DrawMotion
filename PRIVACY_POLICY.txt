@@ -4,7 +4,7 @@ Last Updated: October 2026
 Official Team Email: easysoft.dv2team@gmail.com
 Official Portal: https://drawmotion-web.vercel.app/
 
-This Privacy Policy explains how DrawMotion ("the Software"), maintained by Mohamed Fadl and the EASY SOFT TEAM ("we", "us", or "our"), handles your privacy and data.
+This Privacy Policy explains how DrawMotion ("the Software"), maintained by Mohamed Fadl and the DrawMotion Team ("we", "us", or "our"), handles your privacy and data.
 
 --------------------------------------------------------------------------------
 1. CORE PHILOSOPHY: STRICT LOCAL-FIRST ARCHITECTURE
@@ -52,11 +52,11 @@ This policy shall be governed by and construed in accordance with the laws of th
 --------------------------------------------------------------------------------
 6. COPYRIGHT & INQUIRIES
 --------------------------------------------------------------------------------
-Copyright (c) 2026 Mohamed Fadl (EASY SOFT TEAM). All rights reserved.
+Copyright (c) 2026 Mohamed Fadl (DrawMotion Team). All rights reserved.
 
 For any questions, clarifications, or privacy feedback:
 - Email: easysoft.dv2team@gmail.com
 - Official Portal: https://drawmotion-web.vercel.app/
 - GitHub: https://github.com/DMotionX/DrawMotion
 - Developer on X: https://x.com/MohamedFad19757
-- Facebook: https://www.facebook.com/profile.php?id=61592234934862
+- Facebook: https://www.facebook.com/profile.php?id=61595676097302
