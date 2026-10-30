@@ -1,252 +1,321 @@
+# Copyright (c) 2026 Mohamed Fadl & DrawMotion Team
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import cv2
 import numpy as np
+import math
+import copy
+from typing import List, Dict, Any
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QImage
-from typing import List, Dict, Any
 from ..base_algorithm import BaseDrawingAlgorithm
 
-import copy
 _SOLID_CACHE = {}
 
 class SolidRevealAlgorithm(BaseDrawingAlgorithm):
     """
-    Algorithm for solid mask shading. 
-    Divides the image into completely independent ink islands, 
-    and shades them one by one using an organic grid path.
+    Modern Component-First Solid Reveal Algorithm.
+    Divides visual artwork into discrete semantic ink components and reveals each 
+    component completely with human hand drawing mechanics:
+      1. Structural Outer Silhouette & Inner Cutout Contours first (instant recognizability).
+      2. Contour-Guided Inward Concentric Shading Rings (100% solid, rich coverage without
+         machine-like horizontal slab scanning or vertical fax wipes).
+      3. Clean in-air travel flights between strokes and between components.
+      4. Fully synchronized timing matching the requested duration with RTL/LTR reading awareness.
     """
-    
+
     def generate_plan(self, qimage: QImage, duration: float, **kwargs) -> List[Dict[str, Any]]:
         rtl = kwargs.get("rtl", False)
+        duration = max(0.5, float(duration or 8.0))
         cache_key = (id(qimage), rtl, duration)
-        
+
         if cache_key in _SOLID_CACHE:
             return copy.deepcopy(_SOLID_CACHE[cache_key])
-            
+
         w, h = qimage.width(), qimage.height()
+        if w <= 0 or h <= 0:
+            return []
+
         ptr = qimage.constBits()
         arr = np.frombuffer(ptr, np.uint8).reshape((h, w, 4)).copy()
-        
-        # Only process pixels with alpha > 10
+
+        # Quick validation: check alpha channel
         alpha = arr[:, :, 3]
-        valid_mask = alpha > 10
-        
-        if not np.any(valid_mask):
+        if not np.any(alpha > 10):
             return []
-            
+
         mask = self._get_ink_mask(qimage)
-        h, w = mask.shape
-        
-        # 1. Connect anti-aliased pixels to form solid islands
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        dilated = cv2.dilate(mask, kernel, iterations=1)
-        
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dilated, connectivity=8)
-        
+        if cv2.countNonZero(mask) == 0:
+            return []
+
+        # Downscale for very large assets while preserving crisp geometry
+        max_dim = 1600.0
+        scale = 1.0
+        work_mask = mask.copy()
+
+        if w > max_dim or h > max_dim:
+            scale = max_dim / max(w, h)
+            new_w = max(1, int(w * scale))
+            new_h = max(1, int(h * scale))
+            work_mask = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+
+        _, work_mask = cv2.threshold(work_mask, 127, 255, cv2.THRESH_BINARY)
+        heal_k = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        work_mask = cv2.morphologyEx(work_mask, cv2.MORPH_CLOSE, heal_k)
+
+        def map_pt(px: float, py: float) -> QPointF:
+            return QPointF(float(px / scale), float(py / scale))
+
+        # 1. Connected components analysis
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(work_mask, connectivity=8)
+        if num_labels <= 1:
+            return []
+
         raw_islands = []
-        for i in range(1, num_labels):
-            x, y, cw, ch, area = stats[i]
-            if area > 10:
+        for lbl in range(1, num_labels):
+            x, y, cw, ch, area = stats[lbl]
+            if area >= 10:
                 raw_islands.append({
+                    "label": int(lbl),
                     "rect": (int(x), int(y), int(cw), int(ch)),
-                    "label": int(i),
-                    "centroid": (float(centroids[i][0]), float(centroids[i][1])),
                     "area": float(area),
-                    "fused_labels": [int(i)]
+                    "centroid": (float(centroids[lbl][0]), float(centroids[lbl][1]))
                 })
-                
+
         if not raw_islands:
             return []
 
-        # 2. Transitive Spatial Proximity & Containment Fusion (Union-Find)
-        # Prevents dropped child components when fusions are multi-level (A -> B -> C),
-        # guaranteeing 100% complete ink coverage with zero missing facial features or word fragments.
+        # 2. Transitive Proximity & Containment Fusion (Union-Find)
+        # Prevents fragmentation of adjacent features, diacritics, and sub-elements
         n = len(raw_islands)
-        parent_uf = list(range(n))
-        
-        def find_uf(k):
-            while parent_uf[k] != k:
-                parent_uf[k] = parent_uf[parent_uf[k]]
-                k = parent_uf[k]
-            return k
+        parent = list(range(n))
 
-        def union_uf(a, b):
-            ra, rb = find_uf(a), find_uf(b)
-            if ra != rb:
-                parent_uf[ra] = rb
+        def find(i: int) -> int:
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
 
-        for j, child in enumerate(raw_islands):
-            c_x, c_y, c_w, c_h = child["rect"]
-            c_area = child["area"]
-            c_cx, c_cy = child["centroid"]
-            
-            # Skip large standalone objects
-            if c_area > 8000.0:
-                continue
-                
-            best_parent_idx = None
-            best_parent_area = float('inf')
-            
-            for i, p_candidate in enumerate(raw_islands):
-                if i == j:
-                    continue
-                p_x, p_y, p_w, p_h = p_candidate["rect"]
-                p_area = p_candidate["area"]
-                if p_area < 1.8 * c_area:
-                    continue
-                    
-                # Check spatial containment or immediate proximity (e.g. face details / dots)
-                margin_x = 18.0
-                margin_y = 24.0
-                if (p_x - margin_x <= c_cx <= p_x + p_w + margin_x and
-                    p_y - margin_y <= c_cy <= p_y + p_h + margin_y):
-                    if p_area < best_parent_area:
-                        best_parent_area = p_area
-                        best_parent_idx = i
-                        
-            if best_parent_idx is not None:
-                union_uf(j, best_parent_idx)
+        def union(i: int, j: int):
+            ri, rj = find(i), find(j)
+            if ri != rj:
+                parent[ri] = rj
 
-        groups = {}
-        for j in range(n):
-            r = find_uf(j)
+        margin = 16
+        for i in range(n):
+            bi = raw_islands[i]["rect"]
+            for j in range(i + 1, n):
+                bj = raw_islands[j]["rect"]
+                ov_x = max(0, min(bi[0] + bi[2] + margin, bj[0] + bj[2] + margin) - max(bi[0] - margin, bj[0] - margin))
+                ov_y = max(0, min(bi[1] + bi[3] + margin, bj[1] + bj[3] + margin) - max(bi[1] - margin, bj[1] - margin))
+                if ov_x > 0 and ov_y > 0:
+                    union(i, j)
+
+        groups: Dict[int, List[Dict[str, Any]]] = {}
+        for i in range(n):
+            r = find(i)
             if r not in groups:
                 groups[r] = []
-            groups[r].append(raw_islands[j])
+            groups[r].append(raw_islands[i])
 
-        merged_islands = []
-        for r, group in groups.items():
-            rep = max(group, key=lambda it: it["area"])
-            all_labels = [it["label"] for it in group]
-            
-            all_x = [stats[lbl][0] for lbl in all_labels]
-            all_y = [stats[lbl][1] for lbl in all_labels]
-            all_x2 = [stats[lbl][0] + stats[lbl][2] for lbl in all_labels]
-            all_y2 = [stats[lbl][1] + stats[lbl][3] for lbl in all_labels]
-            bx, by = min(all_x), min(all_y)
-            bw = max(all_x2) - bx
-            bh = max(all_y2) - by
-            
-            merged_islands.append({
-                "rect": (int(bx), int(by), int(bw), int(bh)),
-                "label": int(rep["label"]),
-                "centroid": (float(rep["centroid"][0]), float(rep["centroid"][1])),
-                "area": float(sum(it["area"] for it in group)),
-                "fused_labels": all_labels
-            })
+        # 3. Generate Structural Contours + Concentric Infill per component
+        components = []
+        fill_step = 8
+        brush_w = max(18.0, 22.0 / scale)
+        erosion_k = cv2.getStructuringElement(cv2.MORPH_RECT, (fill_step, fill_step))
 
-        # 3. Sort islands naturally into reading lines (RTL / LTR)
-        islands = BaseDrawingAlgorithm.cluster_islands_into_lines(
-            merged_islands, rtl=rtl, sort_mode="right_to_left" if rtl else "left_to_right"
-        )
-            
-        grid_size = 15
-        band_height = 100
-        segments = []
-        
-        # 4. Generate smooth organic scribble path for each island
-        for island in islands:
-            target_labels = island.get("fused_labels", [island["label"]])
-            bx, by, bw, bh = island["rect"]
-            
-            sub_labels = labels[by:by+bh, bx:bx+bw]
-            sub_mask = np.isin(sub_labels, target_labels)
-            
-            blocks = []
-            for r_rel in range(0, bh, grid_size):
-                for c_rel in range(0, bw, grid_size):
-                    r_end = min(r_rel + grid_size, bh)
-                    c_end = min(c_rel + grid_size, bw)
-                    if np.any(sub_mask[r_rel:r_end, c_rel:c_end]):
-                        blocks.append((bx + c_rel + grid_size // 2, by + r_rel + grid_size // 2))
-                        
-            if not blocks:
-                continue
-                
-            if bh <= 160:
-                # Small or medium island: single continuous organic TSP sweep
-                if rtl and blocks:
-                    start_idx = max(range(len(blocks)), key=lambda i: blocks[i][0] - blocks[i][1])
-                else:
-                    start_idx = min(range(len(blocks)), key=lambda i: blocks[i][0] + blocks[i][1])
-                    
-                path = [blocks.pop(start_idx)]
-                while blocks:
-                    curr = path[-1]
-                    arr = np.array(blocks)
-                    dists = (arr[:, 0] - curr[0])**2 + (arr[:, 1] - curr[1])**2
-                    min_idx = np.argmin(dists)
-                    path.append(blocks.pop(min_idx))
-            else:
-                # Tall macro-island: Banded vertical sweep
-                # Ensures face and upper features are 100% completed before descending down
-                bands = []
-                y_start = by
-                while y_start < by + bh:
-                    y_end = y_start + band_height
-                    band_blocks = [b for b in blocks if y_start <= b[1] < y_end]
-                    if band_blocks:
-                        bands.append(band_blocks)
-                    y_start = y_end
-                    
-                path = []
-                last_pt = None
-                for band in bands:
-                    if not band:
-                        continue
-                    if last_pt is None:
-                        if rtl:
-                            start_idx = max(range(len(band)), key=lambda i: band[i][0] - band[i][1])
-                        else:
-                            start_idx = min(range(len(band)), key=lambda i: band[i][0] + band[i][1])
-                        curr = band.pop(start_idx)
+        for comp_idx, (r, body_list) in enumerate(groups.items()):
+            min_x = min(b["rect"][0] for b in body_list)
+            min_y = min(b["rect"][1] for b in body_list)
+            max_x = max(b["rect"][0] + b["rect"][2] for b in body_list)
+            max_y = max(b["rect"][1] + b["rect"][3] for b in body_list)
+
+            comp_mask = np.zeros_like(work_mask)
+            for b in body_list:
+                comp_mask[labels == b["label"]] = 255
+
+            # Extract contours: separate external boundaries and inner cutouts
+            contours, hierarchy = cv2.findContours(comp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+            ext_contours = []
+            hole_contours = []
+            if hierarchy is not None:
+                for i, c in enumerate(contours):
+                    is_hole = hierarchy[0][i][3] != -1
+                    if is_hole:
+                        hole_contours.append(c)
                     else:
-                        arr = np.array(band)
-                        dists = (arr[:, 0] - last_pt[0])**2 + (arr[:, 1] - last_pt[1])**2
-                        min_idx = np.argmin(dists)
-                        curr = band.pop(min_idx)
-                        
-                    path.append(curr)
-                    while band:
-                        curr = path[-1]
-                        arr = np.array(band)
-                        dists = (arr[:, 0] - curr[0])**2 + (arr[:, 1] - curr[1])**2
-                        min_idx = np.argmin(dists)
-                        path.append(band.pop(min_idx))
-                    last_pt = path[-1]
-                    
-            pts = [QPointF(float(p[0]), float(p[1])) for p in path]
-            if len(pts) == 1:
-                pts.append(QPointF(pts[0].x() + 1.0, pts[0].y()))
-                
-            length = self._calculate_length(pts)
-            segments.append({
-                "type": "stroke",
-                "points": pts,
-                "length": length,
-                "width": grid_size * 2.2,
-                "opacity": 1.0
-            })
-            
-        # 5. Assign timestamps
-        total_length = sum(seg["length"] for seg in segments) or 1.0
-        accumulated_time = 0.0
-        
-        timed_segments = []
-        for seg in segments:
-            seg_share = seg["length"] / total_length
-            seg_duration = duration * seg_share
-            
-            timed_segments.append({
-                "type": seg["type"],
-                "points": seg["points"],
-                "duration": seg_duration,
-                "start_time": accumulated_time,
-                "end_time": accumulated_time + seg_duration,
-                "width": seg["width"],
-                "opacity": seg["opacity"]
-            })
-            accumulated_time += seg_duration
-            
+                        ext_contours.append(c)
+            else:
+                ext_contours = list(contours)
+
+            # Sort external boundaries by area descending for confident stroke placement
+            ext_contours.sort(key=lambda c: cv2.contourArea(c), reverse=True)
+
+            outline_paths = []
+            for c in (ext_contours + hole_contours):
+                arc = cv2.arcLength(c, True)
+                if arc >= 6:
+                    approx = cv2.approxPolyDP(c, 0.002 * arc, True)
+                    if len(approx) >= 3:
+                        pts = [map_pt(pt[0][0], pt[0][1]) for pt in approx]
+                        pts.append(pts[0])
+                    else:
+                        pts = [map_pt(pt[0][0], pt[0][1]) for pt in c]
+                        if len(pts) >= 2:
+                            pts.append(pts[0])
+                else:
+                    cx_c = float(np.mean(c[:, 0, 0]))
+                    cy_c = float(np.mean(c[:, 0, 1]))
+                    pts = [map_pt(cx_c - 1.5, cy_c), map_pt(cx_c + 1.5, cy_c)]
+                if pts:
+                    outline_paths.append(pts)
+
+            # Concentric Inward Infill: iterative erosion rings
+            infill_paths = []
+            sub_mask = cv2.erode(comp_mask, erosion_k, iterations=1)
+            max_rings = 45
+
+            while cv2.countNonZero(sub_mask) > 0 and max_rings > 0:
+                max_rings -= 1
+                ring_cnts, _ = cv2.findContours(sub_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+                if not ring_cnts:
+                    break
+
+                for rc in ring_cnts:
+                    rc_arc = cv2.arcLength(rc, True)
+                    if rc_arc >= 6:
+                        approx = cv2.approxPolyDP(rc, 0.003 * rc_arc, True)
+                        if len(approx) >= 3:
+                            r_pts = [map_pt(pt[0][0], pt[0][1]) for pt in approx]
+                            r_pts.append(r_pts[0])
+                        else:
+                            r_pts = [map_pt(pt[0][0], pt[0][1]) for pt in rc]
+                            if len(r_pts) >= 2:
+                                r_pts.append(r_pts[0])
+                    else:
+                        rcx = float(np.mean(rc[:, 0, 0]))
+                        rcy = float(np.mean(rc[:, 0, 1]))
+                        r_pts = [map_pt(rcx - 1.0, rcy), map_pt(rcx + 1.0, rcy)]
+                    if r_pts:
+                        infill_paths.append(r_pts)
+
+                prev_nz = cv2.countNonZero(sub_mask)
+                sub_mask = cv2.erode(sub_mask, erosion_k, iterations=1)
+                if cv2.countNonZero(sub_mask) == prev_nz:
+                    # Centroid core cap
+                    M = cv2.moments(sub_mask)
+                    if M['m00'] > 0:
+                        cx_core = float(M['m10'] / M['m00'])
+                        cy_core = float(M['m01'] / M['m00'])
+                        infill_paths.append([map_pt(cx_core - 1.0, cy_core), map_pt(cx_core + 1.0, cy_core)])
+                    break
+
+            all_comp_paths = outline_paths + infill_paths
+            if all_comp_paths:
+                total_area = sum(b["area"] for b in body_list)
+                components.append({
+                    "name": f"Component {comp_idx + 1}",
+                    "paths": all_comp_paths,
+                    "stroke_width": brush_w,
+                    "rect": (min_x / scale, min_y / scale, (max_x - min_x) / scale, (max_y - min_y) / scale),
+                    "centroid": ((min_x + max_x) / (2 * scale), (min_y + max_y) / (2 * scale)),
+                    "area": float(total_area)
+                })
+
+        if not components:
+            return []
+
+        # 4. Sort components naturally along reading direction (RTL / LTR)
+        row_band = 60.0
+        if rtl:
+            components.sort(key=lambda c: (round(c["rect"][1] / row_band), -c["rect"][0]))
+        else:
+            components.sort(key=lambda c: (round(c["rect"][1] / row_band), c["rect"][0]))
+
+        # 5. Pack strokes, calculate lengths, and generate timed segments with in-air travels
+        for comp in components:
+            comp["total_length"] = sum(
+                self._calculate_length(pts) for pts in comp["paths"] if pts
+            ) or 1.0
+
+        total_all_length = sum(comp["total_length"] for comp in components) or 1.0
+        timed_segments: List[Dict[str, Any]] = []
+        current_time = 0.0
+
+        for comp in components:
+            target_comp_duration = max(0.05, duration * (comp["total_length"] / total_all_length))
+            paths = comp["paths"]
+
+            comp_segments: List[Dict[str, Any]] = []
+            comp_accum = 0.0
+            stroke_w = comp["stroke_width"]
+
+            path_data = []
+            for pts in paths:
+                if not pts:
+                    continue
+                uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
+                length = self._calculate_length(uniform_pts)
+                if length > 0:
+                    path_data.append({"pts": uniform_pts, "length": max(2.0, length)})
+
+            if not path_data:
+                continue
+
+            total_comp_len = sum(item["length"] for item in path_data) or 1.0
+
+            for item in path_data:
+                seg_dur = max(0.005, target_comp_duration * (item["length"] / total_comp_len))
+
+                # In-air travel flight between disconnected strokes or components
+                if comp_segments or timed_segments:
+                    last_pt = comp_segments[-1]["points"][-1] if comp_segments else timed_segments[-1]["points"][-1]
+                    st_pt = item["pts"][0]
+                    dist = math.hypot(st_pt.x() - last_pt.x(), st_pt.y() - last_pt.y())
+                    if dist > 8.0:
+                        travel_dur = min(0.12, max(0.035, dist / 2200.0))
+                        comp_segments.append({
+                            "type": "travel",
+                            "points": [last_pt, st_pt],
+                            "duration": travel_dur,
+                            "start_time": comp_accum,
+                            "end_time": comp_accum + travel_dur,
+                            "width": 0.0,
+                            "opacity": 0.0
+                        })
+                        comp_accum += travel_dur
+
+                comp_segments.append({
+                    "type": "stroke",
+                    "points": item["pts"],
+                    "duration": seg_dur,
+                    "start_time": comp_accum,
+                    "end_time": comp_accum + seg_dur,
+                    "width": stroke_w,
+                    "opacity": 1.0
+                })
+                comp_accum += seg_dur
+
+            if comp_segments and comp_accum > 0:
+                scale_f = target_comp_duration / comp_accum
+                for seg in comp_segments:
+                    seg["duration"] *= scale_f
+                    seg["start_time"] = current_time
+                    current_time += seg["duration"]
+                    seg["end_time"] = current_time
+                    timed_segments.append(seg)
+
+        # Final timeline synchronization to exactly match duration
+        if timed_segments and current_time > 0:
+            scale_time = duration / current_time
+            cur_t = 0.0
+            for seg in timed_segments:
+                seg["duration"] *= scale_time
+                seg["start_time"] = cur_t
+                cur_t += seg["duration"]
+                seg["end_time"] = cur_t
+
         _SOLID_CACHE[cache_key] = copy.deepcopy(timed_segments)
         return timed_segments
 
@@ -258,3 +327,4 @@ class SolidRevealAlgorithm(BaseDrawingAlgorithm):
             dy = points[i].y() - points[i-1].y()
             length += math.hypot(dx, dy)
         return length
+

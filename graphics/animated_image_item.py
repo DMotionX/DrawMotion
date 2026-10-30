@@ -54,7 +54,7 @@ class PlannerWorker(QObject):
                 # Modern vector algorithms (Professional, Sketch, Educational, etc.) already manage intentional strokes
                 # and explicit in-air travel flights. Preserving them eliminates white gaps and chopped lines.
                 if segment.get("type") in ["stroke", "travel"] or self.style_name in [
-                    "Professional", "Sketch", "Educational", "Organic Sketch", "Hatch Shading", 
+                    "Solid Reveal", "Professional", "Sketch", "Educational", "Organic Sketch", "Hatch Shading", 
                     "Clean Outline", "Line Art (Skeleton)", "Blueprint Drafting", "Engraving Hatch", "Ribbon Flow"
                 ]:
                     new_seg = dict(segment)
