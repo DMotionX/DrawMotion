@@ -73,28 +73,38 @@ def test_solid_reveal_component_first_no_vertical_scan_slicing(qapp):
         f"before Component 2 starts (start={first_comp2_start:.2f}s)!"
     )
 
-def test_solid_reveal_contour_first_before_infill(qapp):
+def test_solid_reveal_connected_wire_schematic_strict_piece_by_piece(qapp):
     """
-    Verifies that the first stroke of an object is its structural boundary contour
-    for immediate recognizability, followed by inward concentric infill rings.
+    Verifies that when multiple objects are connected by a wire or cable (e.g. Laptop + Cable + Arduino + LED),
+    they are NOT merged into one simultaneous drawing block. Each piece is drawn 100% completely before moving on!
     """
-    qimg = make_test_multicomponent_qimage()
+    w, h = 1200, 500
+    canvas = np.full((h, w, 3), 255, dtype=np.uint8)
+    # Laptop on left (area > 8000)
+    cv2.rectangle(canvas, (100, 100), (350, 400), (0, 0, 0), -1)
+    # Cable touching laptop and touching arduino
+    cv2.line(canvas, (350, 250), (600, 250), (0, 0, 0), 4)
+    # Arduino on right (area > 8000)
+    cv2.rectangle(canvas, (600, 100), (850, 400), (0, 0, 0), -1)
+    rgba = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGBA)
+    qimg = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_RGBA8888)
+
     algo = SolidRevealAlgorithm()
     plan = algo.generate_plan(qimg, duration=8.0, rtl=False)
-
     strokes = [s for s in plan if s.get("type") == "stroke"]
-    comp1_strokes = [s for s in strokes if s["points"][0].x() < 500]
 
-    # The first stroke is the outer boundary contour
-    first_stroke = comp1_strokes[0]
-    pts = first_stroke["points"]
-    assert len(pts) >= 4, "Outer contour stroke should outline the boundary"
+    laptop_strokes = [s for s in strokes if s["points"][0].x() <= 360]
+    arduino_strokes = [s for s in strokes if s["points"][0].x() >= 600]
 
-    # Outer contour must be near the outer boundaries (x ~ 100..400, y ~ 150..500)
-    xs = [p.x() for p in pts]
-    ys = [p.y() for p in pts]
-    assert min(xs) <= 120 and max(xs) >= 380
-    assert min(ys) <= 170 and max(ys) >= 480
+    assert len(laptop_strokes) > 0, "Laptop must have strokes"
+    assert len(arduino_strokes) > 0, "Arduino must have strokes"
+
+    last_laptop_end = max(s["end_time"] for s in laptop_strokes)
+    first_arduino_start = min(s["start_time"] for s in arduino_strokes)
+
+    assert last_laptop_end <= first_arduino_start + 1e-4, (
+        f"Laptop must be 100% completed (end={last_laptop_end:.2f}s) before Arduino starts (start={first_arduino_start:.2f}s)!"
+    )
 
 def test_solid_reveal_in_air_travel_flights(qapp):
     """
