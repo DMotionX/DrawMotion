@@ -135,7 +135,7 @@ class ScenesLayerRow(BaseLayerRow):
                 if t_type and t_type != "None":
                     t_dur = getattr(prev_board, 'transition_duration', 1.0)
                 current_time += t_dur
-            base_dur = getattr(board, 'duration', 8.0)
+            base_dur = getattr(board, 'duration', 2.0)
             items = [i for i in self._workspace.user_items if i.parentItem() == board]
             
             # Find the actual compiled end time for this scene from the scheduler
@@ -152,9 +152,9 @@ class ScenesLayerRow(BaseLayerRow):
 
             if items:
                 # Dynamically stretch the scene duration to fit all items
-                dur = max(base_dur, max_item_dur)
+                dur = max(2.0, base_dur, max_item_dur)
             else:
-                dur = base_dur
+                dur = max(2.0, base_dur)
                 
             is_active = (i == self._workspace.current_scene_index) if self._workspace else False
             blocks.append({'start': current_time, 'duration': dur,

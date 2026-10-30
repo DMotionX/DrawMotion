@@ -346,18 +346,35 @@ class TimelinePanel(QFrame):
     def set_workspace(self, workspace):
         self.workspace = workspace
 
+    def compute_total_project_duration(self) -> float:
+        total_time = 0.0
+        if self.workspace:
+            if hasattr(self.workspace, 'artboards') and self.workspace.artboards:
+                cur_t = 0.0
+                for i, b in enumerate(self.workspace.artboards):
+                    if cur_t > 0 and i > 0:
+                        prev_b = self.workspace.artboards[i - 1]
+                        t_type = getattr(prev_b, 'transition_type', None)
+                        if t_type and t_type != "None":
+                            cur_t += getattr(prev_b, 'transition_duration', 1.0)
+                    cur_t += getattr(b, 'duration', 2.0)
+                total_time = cur_t
+            if hasattr(self.workspace, 'animator_engine'):
+                schedule = getattr(self.workspace.animator_engine, 'schedule', None)
+                if schedule:
+                    sched_max = max((a.get('end', 0.0) for a in schedule), default=0.0)
+                    total_time = max(total_time, sched_max)
+        return max(2.0, total_time)
+
     def set_playhead_progress(self, current_time_sec):
+        self._last_progress_time = current_time_sec
         x_pos = int(current_time_sec * PIXELS_PER_SECOND)
         self.playhead_line.move(x_pos, 0)
         self.playhead_line.setFixedHeight(self._tracks_container.height())
         self.playhead_line.raise_()
         
         # Update Digital Timer
-        total_time = 0.0
-        if self.workspace and hasattr(self.workspace, 'animator_engine'):
-            schedule = self.workspace.animator_engine.schedule
-            if schedule:
-                total_time = max(a['end'] for a in schedule)
+        total_time = self.compute_total_project_duration()
         
         def fmt(t):
             m = int(t // 60)
@@ -414,9 +431,15 @@ class TimelinePanel(QFrame):
             t_idx = self._tracks_layout.count() - 1
             self._tracks_layout.insertWidget(t_idx, row.track_widget())
 
-        # Keep playhead on top
+        # Keep playhead on top and synchronize with project duration
         if hasattr(self, 'playhead_line'):
             self.playhead_line.raise_()
+            total_dur = self.compute_total_project_duration()
+            current_t = getattr(self, '_last_progress_time', 0.0)
+            if current_t > total_dur:
+                current_t = 0.0 if not (self.workspace and self.workspace.user_items) else total_dur
+                self._last_progress_time = current_t
+            self.set_playhead_progress(current_t)
             
         self._left_layout.invalidate()
         self._tracks_layout.invalidate()

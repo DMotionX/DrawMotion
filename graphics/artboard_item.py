@@ -25,7 +25,8 @@ class SceneArtboardItem(QGraphicsRectItem):
         
         # Solid white fill so it looks like a distinct "page" or "scene"
         self.setBrush(QBrush(QColor(255, 255, 255)))
-        self.duration = 8.0 # Default scene duration in seconds
+        self.duration = 2.0 # Default scene duration in seconds (standard across DrawMotion)
+        self.user_defined_duration = None # Preserves manual custom duration if set by user
         
         self.scene_index = 1
         self.total_scenes = 1
@@ -82,6 +83,7 @@ class SceneArtboardItem(QGraphicsRectItem):
                 
                 # Fallback if workspace method not found
                 self.duration = new_dur
+                self.user_defined_duration = new_dur
                 self._recalculate_scene_times()
                 
     def _recalculate_scene_times(self):
@@ -91,7 +93,7 @@ class SceneArtboardItem(QGraphicsRectItem):
             if views:
                 workspace = views[0].parent()
                 if hasattr(workspace, 'distribute_global_time'):
-                    workspace.distribute_global_time()
+                    workspace.distribute_global_time(respect_board_duration=True)
 
     def _set_aspect_ratio(self, w, h):
         self.setRect(self.rect().x(), self.rect().y(), w, h)
