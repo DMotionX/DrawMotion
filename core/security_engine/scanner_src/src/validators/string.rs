@@ -3,8 +3,12 @@ use crate::error::ScannerError;
 
 pub fn is_safe_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
-        || matches!(c, '.' | '_' | '-' | ' ')
-        || ('\u{0600}'..='\u{06FF}').contains(&c) // Arabic block
+        || matches!(c, '.' | '_' | '-' | ' ' | '(' | ')')
+        || ('\u{0600}'..='\u{06FF}').contains(&c) // Arabic primary
+        || ('\u{0750}'..='\u{077F}').contains(&c) // Arabic Supplement
+        || ('\u{08A0}'..='\u{08FF}').contains(&c) // Arabic Extended-A
+        || ('\u{FB50}'..='\u{FDFF}').contains(&c) // Arabic Presentation Forms-A
+        || ('\u{FE70}'..='\u{FEFF}').contains(&c) // Arabic Presentation Forms-B
 }
 
 pub fn validate_input_string(raw_input: &str) -> Result<(), ScannerError> {
