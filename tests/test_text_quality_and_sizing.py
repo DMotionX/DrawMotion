@@ -4,8 +4,9 @@ import unittest
 from PySide6.QtWidgets import QApplication, QGraphicsScene, QGraphicsRectItem
 from PySide6.QtCore import QRectF, Qt
 
-# Ensure offscreen Qt platform
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
+# Ensure offscreen Qt platform only when needed on headless Linux
+if sys.platform != "win32":
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = QApplication.instance() or QApplication(sys.argv)

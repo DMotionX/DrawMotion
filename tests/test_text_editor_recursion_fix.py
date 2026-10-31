@@ -6,8 +6,9 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QKeyEvent
 
-# Ensure offscreen Qt platform for testing
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
+# Ensure offscreen Qt platform for testing on headless Linux
+if sys.platform != "win32":
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = QApplication.instance() or QApplication(sys.argv)
