@@ -6,7 +6,7 @@ Features: 0ms native Qt Widget startup, smooth capsule progress bar, live subsys
 """
 import os
 import sys
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize, QTimer
 from PySide6.QtGui import QIcon, QPixmap, QColor
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, 
@@ -21,7 +21,7 @@ class InteractiveSplashScreen(QWidget):
     Studio-grade floating reload and splash screen.
     Guarantees instant (<50ms) visual response upon launching DrawMotion.
     """
-    def __init__(self, version: str = "v1.7.13", parent=None):
+    def __init__(self, version: str = "v1.7.14", parent=None):
         super().__init__(parent)
         self.version = version
         self._target_window = None
@@ -180,6 +180,15 @@ class InteractiveSplashScreen(QWidget):
             except Exception:
                 pass
 
+        # Check if running in headless / offscreen mode (e.g., automated CI test runners)
+        is_offscreen = (
+            os.environ.get("QT_QPA_PLATFORM") == "offscreen" or
+            (QApplication.instance() and getattr(QApplication.instance(), "platformName", lambda: "")() == "offscreen")
+        )
+        if is_offscreen:
+            self._on_fade_finished()
+            return
+
         # Smooth fade-out animation over the already-rendered target window
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity")
         self._fade_anim.setDuration(250)
@@ -191,6 +200,11 @@ class InteractiveSplashScreen(QWidget):
 
     def _on_fade_finished(self):
         """Finalizes transition and cleans up splash resources."""
+        if hasattr(self, "_fade_anim") and self._fade_anim:
+            try:
+                self._fade_anim.stop()
+            except Exception:
+                pass
         if self._target_window is not None:
             try:
                 self._target_window.raise_()
@@ -198,4 +212,4 @@ class InteractiveSplashScreen(QWidget):
             except Exception:
                 pass
         self.close()
-        self.deleteLater()
+        QTimer.singleShot(0, self.deleteLater)

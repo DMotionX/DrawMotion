@@ -292,8 +292,8 @@ class DraggableBlock(QFrame):
                 self.setCursor(Qt.CursorShape.SizeAllCursor) # Cursor for moving
         elif getattr(self, '_resizing', False):
             dx = event.globalPosition().x() - self._drag_start_x
-            new_width = max(10, self._original_width + dx)
-            new_duration = new_width / self.pixels_per_second
+            min_dur = 2.0 if self.data.get('is_scene_block') else 0.5
+            new_duration = max(min_dur, (self._original_width + dx) / self.pixels_per_second)
             self.duration = new_duration
             self._update_width()
             

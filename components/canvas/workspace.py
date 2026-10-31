@@ -383,7 +383,9 @@ class CanvasWorkspace(QFrame):
         Sets the scene duration and scales all animated items inside it 
         so their total duration matches the new scene duration.
         """
+        new_dur = max(2.0, float(new_dur))
         board.duration = new_dur
+        board.user_defined_duration = new_dur
         
         scene_items = [item for item in self.user_items if item.parentItem() == board]
         anim_items = [item for item in scene_items if hasattr(item, '_anim_duration')]
@@ -466,11 +468,21 @@ class CanvasWorkspace(QFrame):
                                 if action['type'] == 'draw' and action['item']:
                                     action['item'].anim_delay = action['start']
                     
-                    if respect_board_duration:
-                        actual_dur = max(0.5, getattr(board, 'duration', total_items_duration))
-                    else:
-                        actual_dur = max(0.5, total_items_duration)
+                    DEFAULT_SCENE_DUR = 2.0
+                    if not anim_items:
+                        # Empty scene (all items removed or fresh): restore/maintain default 2.0s
+                        user_dur = getattr(board, 'user_defined_duration', None)
+                        if user_dur is not None and user_dur >= DEFAULT_SCENE_DUR:
+                            actual_dur = user_dur
+                        else:
+                            actual_dur = DEFAULT_SCENE_DUR
                         board.duration = actual_dur
+                    else:
+                        if respect_board_duration:
+                            actual_dur = max(DEFAULT_SCENE_DUR, getattr(board, 'duration', total_items_duration))
+                        else:
+                            actual_dur = max(DEFAULT_SCENE_DUR, total_items_duration)
+                            board.duration = actual_dur
                     
                     new_scene_windows.append({
                         'scene_index': i,
@@ -1041,15 +1053,26 @@ class CanvasWorkspace(QFrame):
         if item in self.user_items:
             self.user_items.remove(item)
             self.scene.removeItem(item)
-            self.animator_engine.hand_item.hide()
-            self.items_changed.emit(self.user_items)
+            if hasattr(self, 'animator_engine') and self.animator_engine:
+                if hasattr(self.animator_engine, 'hand_item') and self.animator_engine.hand_item:
+                    self.animator_engine.hand_item.hide()
+                if hasattr(self.animator_engine, 'writing_hand_item') and self.animator_engine.writing_hand_item:
+                    self.animator_engine.writing_hand_item.hide()
+            
+            # If all items are deleted, stop any ongoing playback and reset playhead to 0
+            if not self.user_items:
+                if hasattr(self, 'animator_engine') and self.animator_engine:
+                    self.animator_engine.stop()
+                if hasattr(self, 'animation_progress'):
+                    self.animation_progress.emit(0.0)
             
             # Redistribute time among remaining items
-            self.distribute_global_time()
+            self.distribute_global_time(respect_board_duration=False)
             
             # Immediately resync the animator engine queue to match the remaining items
-            items_to_animate = self.user_items
-            self.animator_engine.sync_queue(items_to_animate)
+            items_to_animate = list(self.user_items)
+            if hasattr(self, 'animator_engine') and self.animator_engine:
+                self.animator_engine.sync_queue(items_to_animate, force_recompile=True)
             
             self.items_changed.emit(items_to_animate)
             

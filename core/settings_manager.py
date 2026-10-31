@@ -18,7 +18,7 @@ class SettingsManager(QObject):
     DEFAULT_SETTINGS = {
         # Project Settings
         "canvas_size": "16:9",
-        "default_scene_duration": 8.0,
+        "default_scene_duration": 2.0,
         "auto_save_enabled": False,
         "auto_save_interval": 5, # minutes
         "default_project_path": os.path.normpath(os.path.expanduser("~/Documents/DrawMotion/Projects")),

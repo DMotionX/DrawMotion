@@ -4,7 +4,7 @@ Thank you for your interest in contributing to DrawMotion. We are building an op
 
 ---
 
-## Recent Architectural Updates & Solved Issues (v1.7.13)
+## Recent Architectural Updates & Solved Issues (v1.7.14)
 
 To help contributors understand the current state of the application and recent developments, here is an overview of the latest bug fixes and functional enhancements:
 

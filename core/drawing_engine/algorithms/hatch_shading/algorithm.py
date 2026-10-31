@@ -22,154 +22,87 @@ class HatchShadingAlgorithm(BaseDrawingAlgorithm):
         mask = self._get_ink_mask(qimage)
         scale = 1.0
         
-        islands = generate_smart_educational_paths(mask, scale)
+        islands = generate_smart_educational_paths(mask, scale, rtl=rtl)
         if not islands:
             return []
             
-        is_zoned = any("zone" in isl for isl in islands)
-        if is_zoned:
-            timed_segments = []
-            current_time = 0.0
-            
-            for isl in islands:
-                target_zone_duration = duration * isl.get("weight", 0.33)
-                paths = isl.get("paths", [])
-                if not paths:
-                    continue
-                    
-                zone_segments = []
-                zone_accum = 0.0
-                
-                # Sort paths within this zone continuously
-                ordered_paths = self._sort_paths_continuous(paths)
-                
-                path_data = []
-                for pts in ordered_paths:
-                    if not pts:
-                        continue
-                    uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
-                    length = self._calculate_length(uniform_pts)
-                    if length > 0 or isl.get("is_dot", False):
-                        path_data.append({"pts": uniform_pts, "length": max(2.0, length)})
-                        
-                if not path_data:
-                    continue
-                    
-                total_zone_length = sum(item["length"] for item in path_data) or 1.0
-                stroke_w = isl.get("stroke_width", 16.0)
-                
-                for item in path_data:
-                    seg_dur = max(0.005, target_zone_duration * (item["length"] / total_zone_length))
-                    
-                    if zone_segments or timed_segments:
-                        last_pt = zone_segments[-1]["points"][-1] if zone_segments else timed_segments[-1]["points"][-1]
-                        st_pt = item["pts"][0]
-                        dist = math.hypot(st_pt.x() - last_pt.x(), st_pt.y() - last_pt.y())
-                        if dist > 8.0:
-                            travel_dur = min(0.12, max(0.035, dist / 2000.0))
-                            zone_segments.append({
-                                "type": "travel",
-                                "points": [last_pt, st_pt],
-                                "duration": travel_dur,
-                                "start_time": zone_accum,
-                                "end_time": zone_accum + travel_dur,
-                                "width": 0.0,
-                                "opacity": 0.0
-                            })
-                            zone_accum += travel_dur
-                            
-                    zone_segments.append({
-                        "type": "stroke",
-                        "points": item["pts"],
-                        "duration": seg_dur,
-                        "start_time": zone_accum,
-                        "end_time": zone_accum + seg_dur,
-                        "width": stroke_w,
-                        "opacity": 1.0
-                    })
-                    zone_accum += seg_dur
-                    
-                if zone_segments and zone_accum > 0:
-                    scale_f = target_zone_duration / zone_accum
-                    for seg in zone_segments:
-                        seg["duration"] *= scale_f
-                        seg["start_time"] = current_time
-                        current_time += seg["duration"]
-                        seg["end_time"] = current_time
-                        timed_segments.append(seg)
-                        
-            return timed_segments
-
-        # Fallback line clustering
-        ordered_islands = self._cluster_islands_pedagogical(islands, rtl=rtl)
-        if not ordered_islands:
-            return []
-
-        for isl in ordered_islands:
+        for isl in islands:
             isl["total_length"] = sum(
-                self._calculate_length(pts) for pts in isl["paths"] if pts
+                self._calculate_length(pts) for pts in isl.get("paths", []) if pts
             ) or 1.0
-
-        total_all_length = sum(isl["total_length"] for isl in ordered_islands) or 1.0
-
-        timed_segments = []
-        accumulated_time = 0.0
+            
+        total_all_length = sum(isl["total_length"] for isl in islands) or 1.0
         
-        for island in ordered_islands:
-            island_length = island["total_length"]
-            island_duration = duration * (island_length / total_all_length)
+        timed_segments = []
+        current_time = 0.0
+        
+        for isl in islands:
+            target_mod_duration = max(0.05, duration * (isl["total_length"] / total_all_length))
+            paths = isl.get("paths", [])
+            if not paths:
+                continue
                 
+            mod_segments = []
+            mod_accum = 0.0
+            stroke_w = isl.get("stroke_width", 16.0)
+            
             path_data = []
-            for pts in island["paths"]:
+            for pts in paths:
                 if not pts:
                     continue
                 uniform_pts = self._resample_path_uniform(pts, step_dist=8.0)
                 length = self._calculate_length(uniform_pts)
-                if length > 0 or island.get("is_dot", False):
+                if length > 0 or isl.get("is_dot", False):
                     path_data.append({"pts": uniform_pts, "length": max(2.0, length)})
                     
             if not path_data:
                 continue
                 
-            total_island_length = sum(item["length"] for item in path_data) or 1.0
+            total_mod_len = sum(item["length"] for item in path_data) or 1.0
             
             for item in path_data:
-                seg_share = item["length"] / total_island_length
-                seg_duration = max(0.015, island_duration * seg_share)
+                seg_dur = max(0.005, target_mod_duration * (item["length"] / total_mod_len))
                 
-                if timed_segments:
-                    last_pt = timed_segments[-1]["points"][-1]
-                    cur_start = item["pts"][0]
-                    dx = cur_start.x() - last_pt.x()
-                    dy = cur_start.y() - last_pt.y()
-                    air_dist = math.hypot(dx, dy)
-                    if air_dist > 12.0:
-                        travel_dur = min(0.12, max(0.035, air_dist / 1400.0))
-                        timed_segments.append({
+                # In-air travel flight between consecutive strokes and between discrete modules
+                if mod_segments or timed_segments:
+                    last_pt = mod_segments[-1]["points"][-1] if mod_segments else timed_segments[-1]["points"][-1]
+                    st_pt = item["pts"][0]
+                    dist = math.hypot(st_pt.x() - last_pt.x(), st_pt.y() - last_pt.y())
+                    if dist > 8.0:
+                        travel_dur = min(0.12, max(0.035, dist / 2000.0))
+                        mod_segments.append({
                             "type": "travel",
-                            "points": [last_pt, cur_start],
+                            "points": [last_pt, st_pt],
                             "duration": travel_dur,
-                            "start_time": accumulated_time,
-                            "end_time": accumulated_time + travel_dur,
+                            "start_time": mod_accum,
+                            "end_time": mod_accum + travel_dur,
                             "width": 0.0,
                             "opacity": 0.0
                         })
-                        accumulated_time += travel_dur
-
-                dynamic_width = max(18.0, min(24.0, 18.0 + item["length"] / 120.0))
-                timed_segments.append({
+                        mod_accum += travel_dur
+                        
+                mod_segments.append({
                     "type": "stroke",
                     "points": item["pts"],
-                    "duration": seg_duration,
-                    "start_time": accumulated_time,
-                    "end_time": accumulated_time + seg_duration,
-                    "width": dynamic_width,
+                    "duration": seg_dur,
+                    "start_time": mod_accum,
+                    "end_time": mod_accum + seg_dur,
+                    "width": stroke_w,
                     "opacity": 1.0
                 })
-                accumulated_time += seg_duration
+                mod_accum += seg_dur
+                
+            if mod_segments and mod_accum > 0:
+                scale_f = target_mod_duration / mod_accum
+                for seg in mod_segments:
+                    seg["duration"] *= scale_f
+                    seg["start_time"] = current_time
+                    current_time += seg["duration"]
+                    seg["end_time"] = current_time
+                    timed_segments.append(seg)
                     
-        if timed_segments and accumulated_time > 0:
-            scale_time = duration / accumulated_time
+        if timed_segments and current_time > 0:
+            scale_time = duration / current_time
             cur_t = 0.0
             for seg in timed_segments:
                 seg["duration"] *= scale_time

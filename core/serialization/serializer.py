@@ -7,7 +7,7 @@ from PySide6.QtGui import QPainterPath, QColor
 from PySide6.QtCore import QPointF
 
 SCHEMA_VERSION = 1
-APP_VERSION = "1.7.13" # Current target version
+APP_VERSION = "1.7.14" # Current target version
 
 class SerializerEngine:
     """
