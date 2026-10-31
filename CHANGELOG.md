@@ -10,26 +10,26 @@ This project adheres to Semantic Versioning (`MAJOR.MINOR.PATCH`).
 
 This release introduces an authentic whiteboard drawing experience by ensuring every distinct piece and object is drawn 100% completely before moving to the next, fixes timeline scene block shrinkage and playhead desynchronization upon deleting items, hardens project archive security against Zip-Slip attacks, and adds rich interactive visual demonstrations to project documentation.
 
-#### Core Drawing Experience & Whiteboard Engine (تجربة رسم السبورة البيضاء الواقعية)
-* **Piece-by-Piece Object Isolation (رسم كل عنصر وتلوينه 100% أولاً):**
+#### Core Drawing Experience & Whiteboard Engine
+* **Piece-by-Piece Object Isolation:**
   - **Solid Reveal Algorithm:** Eliminated unnatural vertical slab slicing where multiple objects on screen were partially filled at the same time. The drawing hand now completes each semantic object (e.g. Laptop, then Arduino, then Arrows, then LEDs) 100% before lifting off the canvas and transitioning to the next item.
   - **Clean Outline Algorithm:** Isolated independent vector contours and shapes so that outlines for each object are drawn continuously without erratic jumping back and forth across the canvas. Added smooth in-air flight paths between distinct pieces.
   - **Professional CAD Assembly:** Restructured structural CAD rendering so that each mechanical object completes all its assembly phases (outer chassis, primary components, connectors, and fine traces) in sequence before moving to other canvas elements.
   - **Organic Sketch Algorithm:** Grouped independent visual clusters to ensure artistic sketches are rendered object by object with natural, continuous hand motions.
   - **Natural Hand Velocity:** Fixed excessive hand speed during fill operations, ensuring consistent drawing speeds and natural transitions between visual elements.
 
-#### Timeline & Canvas Stability (استقرار شريط التايم لاين والمشاهد)
+#### Timeline & Canvas Stability
 * **Scene Duration Shrinkage Elimination:** Fixed an issue where deleting an image or text element caused the scene timeline block to shrink to half a second (0.5s), causing text clipping (`Sc...`). Empty scenes now maintain a clean, stable 2.0-second baseline duration.
 * **Automatic Playhead & Timer Resynchronization:** When all items in a scene are deleted, the red playhead line and digital timer automatically return to the start of the scene (`00:00.0 / 00:02.0`) instead of remaining frozen at the end of the deleted media.
 * **Timeline Block Drag Constraints:** Enforced a minimum duration of 2.0 seconds when resizing scene blocks directly on the timeline, preventing accidental collapsing of scenes.
 * **Preservation of User-Defined Durations:** Manually customized scene durations set via right-click are now preserved even after items are removed or modified.
 
-#### Security & System Protection (محرك الأمان وحماية النظام)
+#### Security & System Protection
 * **Fast In-Memory Protection:** Integrated ultra-fast in-memory validation that prevents application freezing or lag while checking file paths and inputs.
 * **Project Archive Shield (Zip-Slip Protection):** Added security safeguards against malicious or corrupted `.dmproj` archives, preventing files from being written outside the project directory.
 * **Windows Reserved Name Guard:** Added automatic filtering for reserved Windows system names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) to prevent OS-level deadlocks.
 
-#### Visual Documentation & Demos (التوثيق المرئي والعروض التوضيحية)
+#### Visual Documentation & Demos
 * **Live Studio Demonstrations:** Embedded high-resolution animated demonstrations (GIFs) in the project documentation showcasing the full Whiteboard Studio workflow and the natural physics handwriting engine.
 
 ---

@@ -370,8 +370,27 @@ def test_arabic_multiline_handwriting_sequencing():
     assert len(line0_chars) > 0
     assert len(line1_chars) > 0
 
-    line0_times = [tmap[int(ch['y']):int(ch['y']+ch['h']), int(ch['x']):int(ch['x']+ch['w'])].min() for ch in line0_chars]
-    line1_times = [tmap[int(ch['y']):int(ch['y']+ch['h']), int(ch['x']):int(ch['x']+ch['w'])].min() for ch in line1_chars]
+    def _get_char_ink_time(ch):
+        cx, cy, cw, ch_h = int(ch['x']), int(ch['y']), int(ch['w']), int(ch['h'])
+        crop_t = tmap[cy:cy+ch_h, cx:cx+cw]
+        crop_a = alpha[cy:cy+ch_h, cx:cx+cw]
+
+        # In multiline text, exclude the top boundary row (adjacent to preceding line)
+        # to guarantee measuring the character's genuine ink rather than an overlapping neighbor descender
+        if ch['line_idx'] > 0 and crop_t.shape[0] > 4:
+            crop_t_inner = crop_t[2:, :]
+            crop_a_inner = crop_a[2:, :]
+        else:
+            crop_t_inner = crop_t
+            crop_a_inner = crop_a
+
+        ink_mask = crop_a_inner > 50
+        if np.any(ink_mask):
+            return crop_t_inner[ink_mask].min()
+        return crop_t.min()
+
+    line0_times = [_get_char_ink_time(ch) for ch in line0_chars]
+    line1_times = [_get_char_ink_time(ch) for ch in line1_chars]
 
     # Line 0 must finish before Line 1 begins
     assert max(line0_times) <= min(line1_times), (
@@ -382,12 +401,11 @@ def test_arabic_multiline_handwriting_sequencing():
     line1_rightmost = max(line1_chars, key=lambda ch: ch['x'])
     line1_leftmost = min(line1_chars, key=lambda ch: ch['x'])
 
-    t_rightmost = tmap[int(line1_rightmost['y']):int(line1_rightmost['y']+line1_rightmost['h']),
-                       int(line1_rightmost['x']):int(line1_rightmost['x']+line1_rightmost['w'])].min()
-    t_leftmost = tmap[int(line1_leftmost['y']):int(line1_leftmost['y']+line1_leftmost['h']),
-                      int(line1_leftmost['x']):int(line1_leftmost['x']+line1_leftmost['w'])].min()
+    t_rightmost = _get_char_ink_time(line1_rightmost)
+    t_leftmost = _get_char_ink_time(line1_leftmost)
 
     assert t_rightmost < t_leftmost, (
         f"Line 1 must be written Right-to-Left: rightmost char time ({t_rightmost}) "
         f"must be strictly earlier than leftmost char time ({t_leftmost})"
     )
+
