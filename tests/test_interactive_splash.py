@@ -12,17 +12,17 @@ def qapp():
     return app
 
 def test_interactive_splash_initialization(qapp):
-    splash = InteractiveSplashScreen(version="v1.7.13")
+    splash = InteractiveSplashScreen(version="v1.7.14")
     assert splash is not None
-    assert splash.version == "v1.7.13"
+    assert splash.version == "v1.7.14"
     assert splash.title_label.text() == "DRAWMOTION"
     assert splash.subtitle_label.text() == "ANIMATION STUDIO"
-    assert splash.version_badge.text() == "v1.7.13"
+    assert splash.version_badge.text() == "v1.7.14"
     assert splash.progress_bar.value() == 0
     splash.close()
 
 def test_interactive_splash_progress_updates(qapp):
-    splash = InteractiveSplashScreen(version="v1.7.13")
+    splash = InteractiveSplashScreen(version="v1.7.14")
     splash.show()
     
     splash.set_progress(25, "Verifying health...")
@@ -45,7 +45,7 @@ def test_interactive_splash_progress_updates(qapp):
 
 def test_interactive_splash_finish_smoothly(qapp, qtbot):
     dummy_window = QWidget()
-    splash = InteractiveSplashScreen(version="v1.7.13")
+    splash = InteractiveSplashScreen(version="v1.7.14")
     splash.show()
 
     splash.finish_smoothly(dummy_window)

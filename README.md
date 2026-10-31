@@ -4,7 +4,7 @@
 ### The Open-Source Vector Animation & Whiteboard Studio Powered by Python & Qt
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-Available%20Now-0078D4?style=for-the-badge&logo=microsoft-store&logoColor=white)](https://apps.microsoft.com/detail/9NMVGFL73RH4)
-[![Latest Release](https://img.shields.io/badge/Release-v1.7.11-2ea44f?style=for-the-badge&logo=github)](https://github.com/DMotionX/DrawMotion/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.7.14-2ea44f?style=for-the-badge&logo=github)](https://github.com/DMotionX/DrawMotion/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
 
 <br/>
@@ -40,6 +40,23 @@
 <p align="center">
   <i>DrawMotion Studio running in Ultra-Dark Mode — featuring the dynamic vector canvas, multi-track timeline, audio waveform sync, and precision properties inspector.</i>
 </p>
+
+### 🎬 Live Demonstrations & Animation Showcase
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <b>Whiteboard Drawing & Canvas Studio</b><br/>
+      <i>فيديو توضيحي لاستوديو الرسم والتحريك</i><br/><br/>
+      <img src="docs/video/فيديو%20توضيحي%20اول.gif" alt="DrawMotion Whiteboard Studio Demo" width="100%" style="border-radius: 8px;" />
+    </td>
+    <td width="50%" align="center">
+      <b>Natural Physics Handwriting Engine</b><br/>
+      <i>عرض توضيحي لمحرك الكتابة باليد والمحاكاة الحركية</i><br/><br/>
+      <img src="docs/video/عرض%20توصيحي%20لمحرك%20الكتابة.gif" alt="DrawMotion Handwriting Engine Demo" width="100%" style="border-radius: 8px;" />
+    </td>
+  </tr>
+</table>
 
 </div>
 

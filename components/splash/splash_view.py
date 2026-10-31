@@ -21,7 +21,7 @@ class InteractiveSplashScreen(QWidget):
     Studio-grade floating reload and splash screen.
     Guarantees instant (<50ms) visual response upon launching DrawMotion.
     """
-    def __init__(self, version: str = "v1.7.13", parent=None):
+    def __init__(self, version: str = "v1.7.14", parent=None):
         super().__init__(parent)
         self.version = version
         self._target_window = None

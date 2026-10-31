@@ -4,6 +4,14 @@ This directory contains the engineering specifications, architectural models, an
 
 ---
 
+## 🎬 Visual Showcase & Demonstrations
+
+| Whiteboard Drawing & Canvas Studio | Natural Physics Handwriting Engine |
+| :---: | :---: |
+| ![Whiteboard Studio Demo](video/فيديو%20توضيحي%20اول.gif) | ![Handwriting Engine Demo](video/عرض%20توصيحي%20لمحرك%20الكتابة.gif) |
+
+---
+
 ## Architecture and System Design
 
 * [Core Engineering Principles](architecture/core_principles.md): Single Source of Truth (SSOT), memory-safe data serialization, and decoupling patterns.
