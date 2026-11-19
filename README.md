@@ -1,6 +1,13 @@
 <div align="center">
 
 # 🎬 DrawMotion Animation Studio
+
+> **This is a personal fork of [DMotionX/DrawMotion](https://github.com/DMotionX/DrawMotion) with a Linux startup fix.**
+> The upstream Linux builds crash on launch with `AttributeError: module 'ctypes' has no attribute 'windll'`.
+> Fixed here — see [LINUX_FIX.md](LINUX_FIX.md) and the
+> [v1.7.14-linuxfix release](https://github.com/zaddi-zk/DrawMotion/releases/tag/v1.7.14-linuxfix)
+> for ready-to-run AppImage / .deb / tarball.
+
 ### The Open-Source Vector Animation & Whiteboard Studio Powered by Python & Qt
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-Available%20Now-0078D4?style=for-the-badge&logo=microsoft-store&logoColor=white)](https://apps.microsoft.com/detail/9NMVGFL73RH4)
