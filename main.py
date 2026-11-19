@@ -42,7 +42,8 @@ def _install_native_crash_handler():
                 f"Diagnostic details have been saved to:\n"
                 f"{os.path.join(get_app_data_dir(), 'Logs', 'crash_log.txt')}"
             )
-            ctypes.windll.user32.MessageBoxW(0, msg, "DrawMotion - Critical Error", 0x10 | 0x10000)
+            if sys.platform == "win32":
+                ctypes.windll.user32.MessageBoxW(0, msg, "DrawMotion - Critical Error", 0x10 | 0x10000)
         except Exception:
             pass
         
@@ -928,12 +929,31 @@ if __name__ == "__main__":
     # ── 2. Single Instance Enforcer (Environment-Isolated Zero-Crash Mutex) ──
     # Development uses 'DrawMotion_Dev_Mutex' and Production uses 'DrawMotion_Prod_Mutex'
     # so they NEVER collide with or block each other.
-    ERROR_ALREADY_EXISTS = 183
     mutex_name = "DrawMotion_Prod_Mutex" if is_frozen_build() else "DrawMotion_Dev_Mutex"
     StartupLifecycleTracker.trace("MUTEX_CHECK", f"Checking instance mutex: {mutex_name}")
 
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
-    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+    if sys.platform == "win32":
+        ERROR_ALREADY_EXISTS = 183
+        ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
+        already_running = ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+    else:
+        # POSIX: advisory file lock (cross-platform replacement for the Win32 mutex).
+        # The open handle is kept for the process lifetime so the lock persists.
+        import fcntl
+        try:
+            _lock_path = os.path.join(get_app_data_dir(), f"{mutex_name}.lock")
+            os.makedirs(os.path.dirname(_lock_path), exist_ok=True)
+            _instance_lock = open(_lock_path, "w")
+            try:
+                fcntl.flock(_instance_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                already_running = False
+            except OSError:
+                already_running = True
+        except Exception:
+            # Never block startup because the lock file could not be created.
+            already_running = False
+
+    if already_running:
         StartupLifecycleTracker.trace("MUTEX_BLOCKED", f"Another instance of {mutex_name} is already active.")
         from PySide6.QtWidgets import QApplication, QMessageBox
         temp_app = QApplication(sys.argv)
@@ -945,12 +965,13 @@ if __name__ == "__main__":
     # ────────────────────────────────────────────────────────────────────────
 
     # ── Windows Taskbar Fix ─────────────────────────────────────────────────
-    try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "DrawMotion.AnimationStudio.1.0"
-        )
-    except Exception:
-        pass
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "DrawMotion.AnimationStudio.1.0"
+            )
+        except Exception:
+            pass
     # ────────────────────────────────────────────────────────────────────────
 
     # Force application-wide locale to English to prevent Arabic/Indic numerals in QSpinBox
